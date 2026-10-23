@@ -293,6 +293,7 @@ table.ct{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:13.5
       <span id="statusText">–</span>
     </div>
     <div class="actions">
+      <button class="btn sm view-hidden" id="cloudPill"></button>
       <button class="btn sm view-hidden" id="autoPill"></button>
       <button class="btn primary view-hidden" id="btnPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>PDF erstellen</button>
     </div>
@@ -373,6 +374,11 @@ table.ct{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:13.5
             <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>Automatische Datensicherung
               <span class="right"><span class="badge grey" id="autoBadge">Aus</span></span></h2>
             <div id="autoBox"></div>
+          </section>
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a5 5 0 0 1-.6-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/></svg></span>Firebase-Speicher
+              <span class="right"><span class="badge grey" id="cloudBadge">Aus</span></span></h2>
+            <div id="cloudBox"></div>
           </section>
         </div>
         <section class="card">
@@ -533,7 +539,7 @@ const defSettings = () => ({
 function normSettings(s) {
   const d = defSettings(); if (!s) return d;
   return { pl: s.pl ?? d.pl, rates: Array.isArray(s.rates) && s.rates.length === 3 ? s.rates : d.rates,
-    gewerke: Array.isArray(s.gewerke) ? s.gewerke : d.gewerke, lastBackup: s.lastBackup || null, auto: s.auto || d.auto };
+    gewerke: Array.isArray(s.gewerke) ? s.gewerke : d.gewerke, lastBackup: s.lastBackup || null, auto: s.auto || d.auto, cloudLast: s.cloudLast || null };
 }
 
 const $ = id => document.getElementById(id);
@@ -605,7 +611,7 @@ function demoProjects() {
 })();
 let saveT;
 function storeLocal() { try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) { toast('Speichern im Browser nicht möglich – bitte Backup speichern'); } }
-function save() { storeLocal(); queueAuto(); }
+function save() { db.updated = Date.now(); storeLocal(); queueAuto(); queueCloud(); }
 function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 300); }
 
 const cur = () => db.projects.find(p => p.id === db.activeId) || db.projects[0];
@@ -946,7 +952,7 @@ function renderSettings() {
     <td class="n" style="padding-left:4px"><input class="in name" data-sg="${i}" data-sgf="name" value="${esc(g.name)}" placeholder="Gewerk …"></td>
     <td><input class="in num amt" data-sg="${i}" data-sgf="price" data-num inputmode="decimal" value="${num(g.price) ? fmt(g.price) : ''}" placeholder="variiert"></td>
     <td><button class="x" data-delsg="${i}" title="Entfernen">×</button></td></tr>`).join('');
-  renderBackupInfo(); renderAuto();
+  renderBackupInfo(); renderAuto(); renderCloud();
 }
 function renderBackupInfo() {
   const lb = S().lastBackup, d = lb ? daysSince(lb) : null;
@@ -1007,6 +1013,7 @@ document.addEventListener('click', e => {
   const nav = t.closest('[data-nav]'); if (nav) { e.preventDefault(); showView(nav.dataset.nav); return; }
   const fl = t.closest('[data-filter]'); if (fl) { listFilter = fl.dataset.filter; renderList(); animateIn($('listTiles')); return; }
   const au = t.closest('[data-auto]'); if (au) { autoAction(au.dataset.auto); return; }
+  const cl = t.closest('[data-cloud]'); if (cl) { cloudAction(cl.dataset.cloud); return; }
   const s = t.closest('[data-start]'); if (s) { startControl(s.dataset.start); return; }
   if (t.closest('#newProjTile')) { newProj(); return; }
   if (t.closest('#btnReopen')) { delete cur().closed; save(); renderForm(); toast('Projekt wieder geöffnet'); return; }
@@ -1147,6 +1154,127 @@ $('fileImport').onchange = e => {
   r.readAsText(f); e.target.value = '';
 };
 
+/* ---------- Firebase-Speicher ----------
+   Die Seite läuft auf GitHub Pages, die Daten liegen in Firestore unter users/{uid}.
+   Anmeldung mit E-Mail/Passwort; jede Änderung wird hochgeladen, Änderungen vom anderen Gerät kommen live herein. */
+const EMBEDDED_FIREBASE = null;   // optional: Firebase-Konfiguration hier fest eintragen, dann entfällt das Einfügen
+const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const DEVICE = (() => { try { let d = localStorage.getItem('pk.device'); if (!d) { d = uid(); localStorage.setItem('pk.device', d); } return d; } catch (e) { return uid(); } })();
+let fb = null, fbUser = null, cloudState = 'off', cloudT, cloudUnsub = null;   // off | file | login | sync | ok | error
+function fbConfig() { if (EMBEDDED_FIREBASE) return EMBEDDED_FIREBASE; try { return JSON.parse(localStorage.getItem('pk.firebase')); } catch (e) { return null; } }
+function parseConfig(txt) {
+  const m = String(txt).match(/\{[\s\S]*\}/); if (!m) throw 0;
+  const c = JSON.parse(m[0].replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":').replace(/'/g, '"').replace(/,\s*}/g, '}'));
+  if (!c.apiKey || !c.projectId) throw 0;
+  return c;
+}
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+async function initCloud() {
+  const cfg = fbConfig();
+  if (!cfg) { cloudState = 'off'; return renderCloud(); }
+  if (location.protocol === 'file:') { cloudState = 'file'; return renderCloud(); }
+  try {
+    if (!window.firebase) { await loadScript(FB_SDK + 'firebase-app-compat.js'); await loadScript(FB_SDK + 'firebase-auth-compat.js'); await loadScript(FB_SDK + 'firebase-firestore-compat.js'); }
+    fb = firebase.apps.length ? firebase.app() : firebase.initializeApp(cfg);
+    cloudState = 'login'; renderCloud();
+    fb.auth().onAuthStateChanged(u => {
+      fbUser = u;
+      if (u) connectCloud();
+      else { if (cloudUnsub) cloudUnsub(); cloudUnsub = null; cloudState = 'login'; renderCloud(); }
+    });
+  } catch (e) { cloudState = 'error'; renderCloud(); }
+}
+const cloudDoc = () => fb.firestore().collection('users').doc(fbUser.uid);
+async function connectCloud() {
+  cloudState = 'sync'; renderCloud();
+  try {
+    const snap = await cloudDoc().get(), remote = snap.exists ? snap.data() : null;
+    let known = false; try { known = localStorage.getItem('pk.synced') === fbUser.uid; } catch (e) {}
+    // Erstes Mal auf diesem Gerät: vorhandene Firebase-Daten haben Vorrang (sonst würden Beispieldaten sie überschreiben)
+    const takeRemote = remote && (known ? (remote.updated || 0) > (db.updated || 0)
+      : confirm('In Firebase sind bereits Projekte gespeichert.\n\nOK = diese Daten auf dieses Gerät laden (empfohlen)\nAbbrechen = die Daten dieses Geräts nach Firebase hochladen'));
+    if (takeRemote) applyRemote(remote, false); else await pushCloud();
+    try { localStorage.setItem('pk.synced', fbUser.uid); } catch (e) {}
+    cloudState = 'ok'; renderCloud();
+    cloudUnsub = cloudDoc().onSnapshot(s => {
+      const r = s.data();
+      if (r && r.device !== DEVICE && (r.updated || 0) > (db.updated || 0)) applyRemote(r, true);
+    });
+  } catch (e) { cloudState = 'error'; renderCloud(); toast(cloudErr(e)); }
+}
+function applyRemote(r, live) {
+  try {
+    const d = JSON.parse(r.data), auto = A();
+    d.settings = normSettings(d.settings); d.settings.auto = auto; d.updated = r.updated; db = d; storeLocal();
+    if (view === 'proj' && !db.projects.find(p => p.id === db.activeId)) view = 'dash';
+    refreshView();
+    toast(live ? 'Aktualisiert vom anderen Gerät' : 'Daten aus Firebase geladen');
+  } catch (e) {}
+}
+function refreshView() {
+  if (view === 'proj') renderForm();
+  else { if (view === 'dash') renderDash(); if (view === 'list') renderList(); if (view === 'settings') renderSettings(); renderPortfolioPill(); renderSide(); }
+}
+function queueCloud() { if (fbUser && cloudState === 'ok') { clearTimeout(cloudT); cloudT = setTimeout(pushCloud, 1200); } }
+async function pushCloud() {
+  if (!db.updated) db.updated = Date.now();
+  await cloudDoc().set({ data: JSON.stringify(db), updated: db.updated, device: DEVICE, savedAt: new Date().toISOString() });
+  S().cloudLast = new Date().toISOString(); storeLocal(); renderCloud(true);
+}
+const cloudErr = e => ({
+  'auth/invalid-credential': 'E-Mail oder Passwort falsch', 'auth/wrong-password': 'Passwort falsch', 'auth/user-not-found': 'Kein Konto mit dieser E-Mail',
+  'auth/email-already-in-use': 'Konto existiert bereits – bitte anmelden', 'auth/weak-password': 'Passwort zu kurz (mind. 6 Zeichen)',
+  'auth/invalid-email': 'Ungültige E-Mail-Adresse', 'auth/unauthorized-domain': 'Diese Web-Adresse ist in Firebase nicht freigegeben (Authentication → Settings → Authorized domains)',
+  'auth/operation-not-allowed': 'In Firebase die Anmeldung mit E-Mail/Passwort aktivieren', 'auth/api-key-not-valid.-please-pass-a-valid-api-key.': 'Firebase-Konfiguration ungültig (apiKey)',
+  'permission-denied': 'Keine Berechtigung – Firestore-Regeln prüfen'
+}[e && e.code] || 'Fehler: ' + ((e && (e.code || e.message)) || 'Konfiguration ungültig'));
+async function cloudAction(a) {
+  try {
+    if (a === 'cfg') { localStorage.setItem('pk.firebase', JSON.stringify(parseConfig($('cCfg').value))); toast('Firebase-Konfiguration gespeichert'); return initCloud(); }
+    if (a === 'forget') { if (!confirm('Firebase-Verbindung auf diesem Gerät entfernen? Die Daten in Firebase bleiben erhalten.')) return; localStorage.removeItem('pk.firebase'); if (fb) await fb.auth().signOut(); location.reload(); return; }
+    if (a === 'retry') return fbUser ? connectCloud() : initCloud();
+    if (a === 'open') return showView('settings');
+    const auth = fb.auth(), em = ($('cEmail') || {}).value, pw = ($('cPw') || {}).value;
+    if (a === 'login') await auth.signInWithEmailAndPassword((em || '').trim(), pw || '');
+    if (a === 'signup') await auth.createUserWithEmailAndPassword((em || '').trim(), pw || '');
+    if (a === 'reset') { await auth.sendPasswordResetEmail((em || '').trim()); toast('E-Mail zum Zurücksetzen gesendet'); }
+    if (a === 'logout') await auth.signOut();
+    if (a === 'push') { await pushCloud(); toast('In Firebase gespeichert'); }
+  } catch (e) { toast(cloudErr(e)); }
+}
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id === 'cPw') cloudAction('login'); });
+function renderCloud(flash) {
+  const st = cloudState, last = S().cloudLast ? new Date(S().cloudLast).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+  const pill = $('cloudPill'), cloudIc = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 18a5 5 0 0 1-.6-10A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/></svg>';
+  if (st === 'ok') { pill.className = 'btn sm okbtn'; pill.dataset.cloud = 'open'; pill.innerHTML = `${cloudIc}Firebase ${last ? last.slice(-5) : ''}`;
+    if (flash) { pill.classList.remove('saved'); void pill.offsetWidth; pill.classList.add('saved'); } }
+  else if (st === 'login') { pill.className = 'btn sm warnbtn'; pill.dataset.cloud = 'open'; pill.innerHTML = `${cloudIc}Anmelden`; }
+  else if (st === 'error') { pill.className = 'btn sm warnbtn'; pill.dataset.cloud = 'retry'; pill.innerHTML = `${cloudIc}Firebase offline – erneut versuchen`; }
+  else if (st === 'sync') { pill.className = 'btn sm'; pill.innerHTML = `${cloudIc}Verbinde …`; }
+  else pill.className = 'btn sm view-hidden';
+  const badge = $('cloudBadge');
+  badge.className = 'badge ' + (st === 'ok' ? 'ok' : st === 'login' || st === 'error' || st === 'file' ? '' : 'grey');
+  badge.textContent = { ok: 'Verbunden', login: 'Nicht angemeldet', error: 'Fehler', file: 'Nur online', sync: 'Verbinde …' }[st] || 'Aus';
+  const forget = '<button class="btn sm danger" data-cloud="forget">Verbindung entfernen</button>';
+  const H = {
+    off: `<p class="muted" style="margin:0 0 10px;font-size:13px;line-height:1.5">Speichert alle Projekte in deiner Firebase-Datenbank. So siehst du sie auf jedem Gerät (z. B. Geschäftslaptop), sobald du dich anmeldest.<br>Füge hier die <b>Firebase-Konfiguration</b> deiner Web-App ein (<i>const firebaseConfig = { … }</i>):</p>
+      <textarea class="in" id="cCfg" rows="6" placeholder='const firebaseConfig = {&#10;  apiKey: "…",&#10;  authDomain: "…",&#10;  projectId: "…",&#10;  …&#10;};' style="font-family:monospace;font-size:12px"></textarea>
+      <button class="btn primary mt" data-cloud="cfg">Firebase verbinden</button>`,
+    file: `<div class="autostate"><span class="dot w"></span><div>Firebase funktioniert nur über die <b>Web-Adresse</b> (GitHub Pages), nicht beim Öffnen als lokale Datei.</div></div>${forget}`,
+    error: `<div class="autostate"><span class="dot b"></span><div>Verbindung zu Firebase fehlgeschlagen. Internet, Konfiguration und Firestore-Regeln prüfen. Deine Daten sind lokal weiterhin gespeichert.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="retry">Erneut versuchen</button>${forget}</div>`,
+    sync: `<div class="autostate"><span class="dot w"></span><div>Verbinde mit Firebase …</div></div>`,
+    login: `<div class="f2"><div class="field"><label class="lbl">E-Mail</label><input class="in" id="cEmail" type="email" autocomplete="username"></div>
+      <div class="field"><label class="lbl">Passwort</label><input class="in" id="cPw" type="password" autocomplete="current-password"></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-cloud="login">Anmelden</button><button class="btn" data-cloud="signup">Konto erstellen</button><button class="btn sm" data-cloud="reset">Passwort vergessen</button></div>
+      <div class="foot">Beim ersten Mal auf dem Hauptgerät «Konto erstellen» – deine bestehenden Projekte werden dann hochgeladen. Auf dem Geschäftslaptop nur «Anmelden».</div>
+      <div class="mt">${forget}</div>`,
+    ok: `<div class="autostate"><span class="dot"></span><div>Angemeldet als <b>${esc(fbUser && fbUser.email)}</b>. Jede Änderung wird automatisch in Firebase gespeichert.<br><span class="muted">Zuletzt: ${last || '–'}</span></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="push">Jetzt speichern</button><button class="btn sm danger" data-cloud="logout">Abmelden</button></div>`
+  };
+  $('cloudBox').innerHTML = H[st] || H.off;
+}
+
 /* ---------- PDF (immer eine A4-Seite) ---------- */
 function pdfName(p) {
   const n = (p.name || 'Projekt').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-');
@@ -1238,6 +1366,7 @@ function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('on
 
 showView('dash');
 initAuto();
+initCloud();
 </script>
 </body>
 </html>
