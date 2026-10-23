@@ -1,0 +1,1243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Projektkontrolling</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+:root{
+  --bg:#1c1f22;--card:rgba(255,255,255,.045);--card-b:rgba(255,255,255,.085);--inner:rgba(255,255,255,.055);
+  --inner-b:rgba(255,255,255,.07);--text:#eef1ee;--muted:#a0a7a2;--dim:#6f7772;
+  --accent:#a9d6a1;--accent-d:#6fae68;--warn:#e9bb6c;--bad:#ec7259;--loss:#ff3b3b;--input:rgba(0,0,0,.22);
+  --r:24px;--r-sm:16px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:radial-gradient(1100px 600px at 15% -10%,#2b332f 0,transparent 60%),radial-gradient(900px 600px at 100% 100%,#262c2a 0,transparent 60%),var(--bg);
+  color:var(--text);font-family:Outfit,system-ui,sans-serif;min-height:100vh;font-size:14px}
+button,input,select,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:64px 1fr 280px;grid-template-rows:auto 1fr;gap:18px 20px;padding:18px 22px 30px;max-width:1700px;margin:0 auto}
+/* top bar */
+.top{grid-column:1/-1;display:flex;align-items:center;gap:16px}
+.logo{display:flex;align-items:center;gap:10px;font-size:20px;font-weight:500;min-width:200px}
+.logo svg{width:28px;height:28px;color:var(--accent)}
+.search{flex:0 1 300px;display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--card-b);border-radius:999px;padding:9px 16px}
+.search input{background:none;border:0;outline:0;width:100%;color:var(--text)}
+.search svg{width:16px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:10px;border-radius:999px;padding:7px 16px 7px 7px;background:var(--card);border:1px solid var(--card-b);white-space:nowrap}
+.pill .ic{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--accent);color:var(--accent)}
+.pill .ic svg{width:15px}
+.pill.status{margin:0 auto;box-shadow:0 0 24px rgba(169,214,161,.08)}
+.pill.status.warn .ic{border-color:var(--warn);color:var(--warn)}
+.pill.status.bad .ic{border-color:var(--bad);color:var(--bad)}
+.pill.status.loss .ic{border-color:var(--loss);color:var(--loss);background:rgba(255,59,59,.15)}
+.actions{display:flex;gap:8px;margin-left:auto}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--card-b);background:var(--card);border-radius:999px;padding:9px 16px;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn:hover{background:rgba(255,255,255,.09)}
+.btn svg{width:16px;height:16px}
+.btn.primary{background:linear-gradient(180deg,#b8e0b1,#8cc585);color:#17201a;border-color:transparent;font-weight:500}
+.btn.primary:hover{filter:brightness(1.06)}
+.btn.sm{padding:6px 12px;font-size:13px}
+.btn.icon{padding:0;width:34px;height:34px;justify-content:center}
+.btn.danger:hover{border-color:var(--bad);color:var(--bad)}
+/* sidebar */
+.side{display:flex;flex-direction:column;gap:10px;align-items:center;padding-top:6px;position:sticky;top:18px;align-self:start}
+.side a{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1px solid var(--card-b);color:var(--muted);transition:.15s}
+.side a:hover{color:var(--text)}
+.side a.on{background:#f2f4f1;color:#1c1f22}
+.side svg{width:18px}
+/* main */
+main{min-width:0}
+.hero{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:4px 0 20px}
+.hero .hi{color:var(--muted);font-size:20px;font-weight:300}
+.hero h1{margin:2px 0 0;font-size:38px;font-weight:400;line-height:1.1}
+.hero .right{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:start}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:var(--r);padding:18px;backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 40px rgba(0,0,0,.18);min-width:0}
+.card h2{display:flex;align-items:center;gap:12px;margin:0 0 16px;font-size:17px;font-weight:400}
+.card h2 .ic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--inner);border:1px solid var(--inner-b);color:var(--muted);flex:0 0 36px}
+.card h2 .ic svg{width:17px}
+.card h2 .right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.inner{background:var(--inner);border:1px solid var(--inner-b);border-radius:var(--r-sm);padding:14px}
+.lbl{font-size:12px;color:var(--muted);margin-bottom:5px;display:block}
+.field{display:flex;flex-direction:column;min-width:0}
+.in{width:100%;background:var(--input);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:9px 12px;outline:0;transition:.15s;color:var(--text)}
+.in:focus{border-color:var(--accent-d);box-shadow:0 0 0 3px rgba(169,214,161,.15)}
+.in.num{text-align:right;font-variant-numeric:tabular-nums}
+select.in{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 16px) 55%,calc(100% - 11px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:30px}
+select.in option{background:#2a2e31}
+textarea.in{resize:vertical;min-height:60px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mt{margin-top:12px}
+.muted{color:var(--muted)}
+.big{font-size:36px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;color:var(--muted);margin-left:2px}
+.result{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(169,214,161,.08);border:1px solid rgba(169,214,161,.22)}
+.result b{font-size:20px;font-weight:400}
+/* slider */
+.slider{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:6px;outline:0;margin:14px 0 6px;
+  background:linear-gradient(90deg,#6e6a55 0%,#e2b35e var(--v,0%),rgba(255,255,255,.12) var(--v,0%))}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#f2c46c;border:3px solid #2a2a24;box-shadow:0 0 14px rgba(242,196,108,.7);cursor:pointer}
+.slider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#f2c46c;border:3px solid #2a2a24;box-shadow:0 0 14px rgba(242,196,108,.7);cursor:pointer}
+.scale{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+.weekbar{display:flex;gap:8px;align-items:end}
+.weekbar .field{flex:1}
+/* cost table */
+table.ct{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:13.5px}
+.ct th{font-weight:500;text-align:left;font-size:13px;padding:12px 4px 4px}
+.ct th.r{text-align:right;color:var(--muted);font-size:11.5px;font-weight:400}
+.ct td{padding:0 4px;vertical-align:middle}
+.ct td.n{padding-left:10px}
+.ct tr.row td{background:rgba(255,255,255,.03);height:38px}
+.ct tr.row td:first-child{border-radius:10px 0 0 10px}
+.ct tr.row td:last-child{border-radius:0 10px 10px 0}
+.ct .in{padding:6px 9px;border-radius:9px}
+.ct .in.amt,.ct .in.name{background:rgba(233,187,108,.07);border-color:rgba(233,187,108,.18)}
+.ct .out{text-align:right;padding-right:10px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.ct .x{background:none;border:0;color:var(--dim);cursor:pointer;width:22px;font-size:16px;padding:0}
+.ct .x:hover{color:var(--bad)}
+.ct tr.sum td{padding:12px 10px;font-weight:500;border-top:1px solid var(--card-b)}
+.ct tr.total td{padding:12px 10px;font-weight:600;font-size:15px;background:rgba(169,214,161,.1);border-top:1px solid rgba(169,214,161,.3)}
+.ct tr.total td:first-child{border-radius:10px 0 0 10px}.ct tr.total td:last-child{border-radius:0 10px 10px 0}
+.std{font-size:11px;border:1px solid rgba(169,214,161,.3);background:rgba(169,214,161,.08);color:var(--accent);border-radius:8px;padding:4px 6px;cursor:pointer;white-space:nowrap;width:100%}
+.std:hover{background:rgba(169,214,161,.2)}
+.std.same{opacity:.3}
+.foot{font-size:12px;color:var(--dim);font-style:italic;margin-top:10px;line-height:1.45}
+/* gauge */
+.gauge{position:relative;width:240px;max-width:100%;margin:0 auto}
+.gauge svg{width:100%;display:block}
+.gauge .c{position:absolute;left:0;right:0;top:36%;text-align:center}
+.gauge .c .v{font-size:46px;font-weight:300}
+.gauge .c .v small{font-size:20px;color:var(--muted)}
+.gauge .c .s{font-size:12px;color:var(--muted);margin-top:2px}
+.legend{display:flex;justify-content:center;gap:14px;font-size:11.5px;color:var(--muted);margin:-6px 0 12px;flex-wrap:wrap}
+.legend i{display:inline-block;width:10px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:var(--inner);border:1px solid var(--inner-b);border-radius:14px;padding:10px 12px;min-width:0}
+.stat .l{font-size:11.5px;color:var(--muted)}
+.stat .v{font-size:17px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pos{color:var(--accent)!important}.neg{color:var(--bad)!important}.wrn{color:var(--warn)!important}
+.hint{font-size:12.5px;line-height:1.5;color:var(--muted);background:rgba(255,255,255,.03);border-radius:12px;padding:10px 12px;border:1px dashed rgba(255,255,255,.08)}
+/* chart + tables */
+.chart{background:rgba(0,0,0,.18);border-radius:var(--r-sm);padding:10px 8px 4px;border:1px solid var(--inner-b)}
+.chart svg{width:100%;display:block}
+.hist{width:100%;border-collapse:collapse;font-size:13px;margin-top:14px}
+.hist th{color:var(--muted);font-weight:400;font-size:11.5px;text-align:right;padding:6px 8px;border-bottom:1px solid var(--card-b);white-space:nowrap}
+.hist th:first-child,.hist td:first-child{text-align:left}
+.hist td{text-align:right;padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-variant-numeric:tabular-nums;white-space:nowrap}
+.hist tr.cur td{background:rgba(169,214,161,.07)}
+.hist tbody tr{cursor:pointer}
+.hist tbody tr:hover td{background:rgba(255,255,255,.04)}
+.hist tr.bad td{background:rgba(234,138,114,.08)}
+.scroll{overflow-x:auto}
+/* dashboard */
+.view-hidden{display:none!important}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;margin-bottom:18px}
+.kpi .l{color:var(--muted);font-size:13px}
+.kpi .v{font-size:30px;font-weight:300;margin-top:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted);margin-top:4px}
+.dgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:18px;align-items:start}
+.ptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.ptile{border-radius:18px;padding:14px;background:var(--inner);border:1px solid var(--inner-b);cursor:pointer;transition:.15s;position:relative}
+.ptile:hover{background:rgba(255,255,255,.08)}
+.ptile .t{font-weight:500;padding-right:22px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptile .s{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ptile .dot{position:absolute;top:16px;right:14px}
+.ptile .row{display:flex;justify-content:space-between;align-items:baseline;margin-top:10px}
+.ptile .db{font-size:22px;font-weight:300}
+.ptile .bar{height:4px;border-radius:4px;background:rgba(255,255,255,.08);margin-top:8px;overflow:hidden}
+.ptile .bar i{display:block;height:100%;background:#e2b35e}
+.ptile .tf{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:10px;font-size:11.5px;color:var(--muted)}
+.ptile.warn{border-color:rgba(233,187,108,.5);background:linear-gradient(160deg,rgba(233,187,108,.14),rgba(255,255,255,.03))}
+.ptile.bad{border-color:rgba(236,114,89,.6);background:linear-gradient(160deg,rgba(236,114,89,.2),rgba(255,255,255,.03))}
+.ptile.loss{border-color:rgba(255,59,59,.8);background:linear-gradient(160deg,rgba(255,59,59,.3),rgba(120,0,0,.1))}
+.ptile.loss .db{color:#ff6b6b}
+.ptile.add{display:grid;place-items:center;text-align:center;border-style:dashed;color:var(--muted);min-height:140px}
+.ptile.add svg{width:26px;margin-bottom:4px}
+.badge{font-size:11px;padding:2px 9px;border-radius:999px;background:rgba(233,187,108,.14);color:var(--warn);border:1px solid rgba(233,187,108,.3);white-space:nowrap}
+.badge.ok{background:rgba(169,214,161,.1);color:var(--accent);border-color:rgba(169,214,161,.25)}
+.badge.red{background:rgba(234,138,114,.14);color:var(--bad);border-color:rgba(234,138,114,.35)}
+.badge.grey{background:rgba(255,255,255,.06);color:var(--muted);border-color:rgba(255,255,255,.1)}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);flex:0 0 10px}
+.dot.w{background:var(--warn);box-shadow:0 0 10px var(--warn)}
+.dot.b{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.dot.x{background:var(--loss);box-shadow:0 0 14px var(--loss)}
+.dot.n{background:var(--dim);box-shadow:none}
+.badge.loss{background:rgba(255,59,59,.2);color:#ff7b7b;border-color:rgba(255,59,59,.55)}
+.zl{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--muted);margin-top:8px}
+.zl span{display:inline-flex;align-items:center;gap:6px}
+.zl .dot{width:8px;height:8px;flex:0 0 8px}
+.dot.g{background:var(--dim);box-shadow:none}
+.due{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:var(--inner);border:1px solid var(--inner-b);margin-bottom:8px}
+.due.late{border-color:rgba(234,138,114,.45)}
+.due .t{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.due .s{font-size:12px;color:var(--muted)}
+.due .btn{margin-left:auto;flex:0 0 auto}
+.empty{color:var(--dim);font-size:13px;text-align:center;padding:10px}
+/* list */
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.chip{border:1px solid var(--card-b);background:var(--inner);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:13px}
+.chip:hover{background:rgba(255,255,255,.09)}
+.chip.on{background:#f2f4f1;color:#1c1f22;border-color:transparent}
+.chip b{font-weight:500;margin-left:6px;opacity:.6}
+/* settings */
+.sgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;align-items:start}
+.rate{display:grid;grid-template-columns:1fr 130px;gap:10px;align-items:center;margin-bottom:8px}
+/* side panel */
+.panel{background:var(--card);border:1px solid var(--card-b);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;position:sticky;top:18px;align-self:start;max-height:calc(100vh - 36px);overflow:auto}
+.panel h3{margin:4px 4px 2px;font-weight:400;font-size:16px}
+.ov-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.ov-sum div{background:var(--inner);border:1px solid var(--inner-b);border-radius:12px;padding:9px 2px;text-align:center}
+.ov-sum b{display:block;font-size:22px;font-weight:400}
+.ov-sum span{font-size:10.5px;color:var(--muted)}
+.stack{display:flex;height:8px;border-radius:8px;overflow:hidden;background:rgba(255,255,255,.08)}
+.stack i{display:block;height:100%}
+.orow{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--inner);border:1px solid var(--inner-b);cursor:pointer;transition:.15s}
+.orow:hover{background:rgba(255,255,255,.08)}
+.orow.warn{background:rgba(233,187,108,.09);border-color:rgba(233,187,108,.4)}
+.orow.bad{background:rgba(236,114,89,.14);border-color:rgba(236,114,89,.55)}
+.orow.loss{background:rgba(255,59,59,.22);border-color:rgba(255,59,59,.75)}
+.orow.on{box-shadow:0 0 0 1.5px var(--accent-d)}
+.orow .n{flex:1;min-width:0}
+.orow .n>div:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:500;font-size:13.5px}
+.orow .s{font-size:11.5px;color:var(--muted)}
+.orow .v{text-align:right;font-variant-numeric:tabular-nums;font-size:14px}
+.banner{display:flex;align-items:center;gap:12px;justify-content:space-between;flex-wrap:wrap;padding:12px 16px;border-radius:16px;margin:-6px 0 18px;background:rgba(169,214,161,.1);border:1px solid rgba(169,214,161,.3)}
+.banner[hidden]{display:none}
+.locked input,.locked textarea,.locked button{pointer-events:none;opacity:.55}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);display:grid;place-items:center;z-index:20;padding:16px;backdrop-filter:blur(4px)}
+.modal[hidden]{display:none}
+.mbox{width:min(560px,100%);background:#262b2e}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%) translateY(20px);background:#2e3431;border:1px solid var(--card-b);padding:8px 16px;border-radius:999px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:30}
+.toast.on{opacity:1;transform:translateX(-50%)}
+.ptile.done{opacity:.8}
+.ptile.done:hover{opacity:1}
+.btn.okbtn{border-color:rgba(169,214,161,.3);color:var(--accent);font-size:12.5px}
+.btn.okbtn .dot{width:8px;height:8px;flex:0 0 8px}
+.btn.warnbtn{border-color:rgba(233,187,108,.5);background:rgba(233,187,108,.12);color:var(--warn)}
+.autostate{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--inner);border:1px solid var(--inner-b);font-size:13px;line-height:1.5;margin-bottom:12px}
+.autostate .dot{margin-top:5px}
+/* ---------- Mikroanimationen ---------- */
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes pop{0%{opacity:0;transform:scale(.3)}70%{transform:scale(1.15)}100%{opacity:1;transform:scale(1)}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes grow{from{width:0}}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(234,138,114,.6)}50%{box-shadow:0 0 0 6px rgba(234,138,114,0)}}
+@keyframes saved{0%{box-shadow:0 0 0 0 rgba(169,214,161,.55)}100%{box-shadow:0 0 0 12px rgba(169,214,161,0)}}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.97)}}
+.enter .card,.enter .ptile,.enter .due{animation:rise .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--d,0ms)}
+.draw{stroke-dasharray:1;animation:draw 1.1s cubic-bezier(.3,.7,.2,1) both}
+.pop{transform-box:fill-box;transform-origin:center;animation:pop .5s .85s both}
+.fade{animation:fadeIn 1s .3s both}
+.ptile .bar i{animation:grow 1s cubic-bezier(.2,.7,.2,1) both}
+.dot.b{animation:pulse 2s infinite}
+.dot.x{animation:pulseX 1.1s infinite}
+@keyframes pulseX{0%,100%{box-shadow:0 0 0 0 rgba(255,59,59,.8)}50%{box-shadow:0 0 0 8px rgba(255,59,59,0)}}
+.saved{animation:saved .9s ease-out}
+.btn,.chip,.std,.side a{transition:transform .15s,background .15s,box-shadow .2s,filter .15s,color .15s}
+.btn:active,.chip:active,.std:active,.side a:active{transform:scale(.95)}
+.side a:hover{transform:translateY(-2px)}
+.ptile{transition:transform .22s cubic-bezier(.2,.7,.2,1),box-shadow .22s,background .2s,opacity .2s}
+.ptile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.28)}
+.orow{transition:transform .2s,background .2s}
+.orow:hover{transform:translateX(-3px)}
+.due{transition:transform .2s,background .2s}
+.due:hover{transform:translateX(3px);background:rgba(255,255,255,.07)}
+.card{transition:border-color .3s}
+.card:hover{border-color:rgba(255,255,255,.13)}
+.hist tbody tr td{transition:background .15s}
+.modal:not([hidden]) .mbox{animation:modalIn .3s cubic-bezier(.2,.7,.2,1)}
+.toast{transition:opacity .25s,transform .35s cubic-bezier(.2,.7,.2,1)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+#printArea{display:none}
+@media (max-width:1380px){
+  .grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.grid .col.c3{grid-column:1/-1}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:1150px){.app{grid-template-columns:64px 1fr}.panel{grid-column:2;position:static;max-height:none}.dgrid,.sgrid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:820px){
+  .app{grid-template-columns:1fr;padding:12px 16px 24px}
+  .side{flex-direction:row;position:static;justify-content:center}
+  .panel{grid-column:1}
+  .grid{display:flex;flex-direction:column;align-items:stretch}
+  .top{flex-wrap:wrap}.logo{min-width:0}.search{flex:1 1 100%;order:5}.pill.status{order:6;margin:0;white-space:normal}
+  .hero h1{font-size:30px}.hero .right{margin-left:0}
+}
+@media print{
+  @page{size:A4;margin:8mm}
+  body{background:#fff}
+  .app,.toast,.modal{display:none!important}
+  #printArea{display:block}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 11.2 12 3l9 8.2V21h-6.5v-6.2h-5V21H3z"/></svg>
+      Projektkontrolling
+    </div>
+    <label class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" placeholder="Projekt suchen …">
+    </label>
+    <div class="pill status" id="statusPill">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 19c0-8 5-13 15-14-1 10-6 15-14 15"/><path d="M5 19 13 11"/></svg></span>
+      <span id="statusText">–</span>
+    </div>
+    <div class="actions">
+      <button class="btn sm view-hidden" id="autoPill"></button>
+      <button class="btn primary view-hidden" id="btnPdf"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6v18h12V7z"/><path d="M14 3v4h4M9 13h6M9 17h6"/></svg>PDF erstellen</button>
+    </div>
+  </header>
+
+  <nav class="side">
+    <a href="#" data-nav="dash" title="Dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 11 12 4l8 7v9h-5v-5h-6v5H4z"/></svg></a>
+    <a href="#" data-nav="list" title="Alle Projekte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></a>
+    <a href="#" data-nav="settings" title="Einstellungen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
+  </nav>
+
+  <main>
+    <!-- ===== Dashboard ===== -->
+    <div id="viewDash">
+      <section class="hero">
+        <div><div class="hi" id="greetD">Guten Tag,</div><h1 id="greetName">Nicola</h1></div>
+        <div class="right"><span class="pill"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16"/></svg></span><span id="dKw">–</span></span></div>
+      </section>
+      <div class="kpis">
+        <div class="card kpi"><div class="l">Laufende Projekte</div><div class="v" id="dActive">–</div><div class="s" id="dActiveS"></div></div>
+        <div class="card kpi"><div class="l">Auftragsvolumen VK</div><div class="v" id="dVk">–</div><div class="s" id="dVkS"></div></div>
+        <div class="card kpi"><div class="l">Ø DB Prognose</div><div class="v" id="dDb">–</div><div class="s" id="dDbS"></div></div>
+        <div class="card kpi"><div class="l">Zu kontrollieren</div><div class="v" id="dDue">–</div><div class="s" id="dDueS"></div></div>
+      </div>
+      <div class="dgrid">
+        <section class="card">
+          <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span><span id="dDueL">Zu kontrollieren</span></h2>
+          <div id="dueList"></div>
+          <div class="foot">Wöchentlich: neuen Ist-Betrag und die kommenden Rechnungen erfassen.</div>
+        </section>
+        <section class="card">
+          <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg></span>Laufende Projekte
+            <span class="right"><button class="btn sm" data-nav="list">Alle Projekte →</button></span></h2>
+          <div class="ptiles" id="projTiles"></div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===== Alle Projekte ===== -->
+    <div id="viewList" class="view-hidden">
+      <section class="hero">
+        <div><div class="hi">Übersicht</div><h1>Alle Projekte</h1></div>
+        <div class="right"><button class="btn primary" id="btnNewProj"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Neues Projekt</button></div>
+      </section>
+      <section class="card">
+        <div class="chips" id="chips"></div>
+        <div class="ptiles" id="listTiles" style="margin-top:14px"></div>
+      </section>
+    </div>
+
+    <!-- ===== Einstellungen ===== -->
+    <div id="viewSettings" class="view-hidden">
+      <section class="hero"><div><div class="hi">Konfiguration</div><h1>Einstellungen</h1></div></section>
+      <div class="sgrid">
+        <div class="col">
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>Projektleiter</h2>
+            <div class="field"><label class="lbl">Name (erscheint auf jedem PDF)</label><input class="in" data-s="pl"></div>
+          </section>
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg></span>Stundenansätze (CHF/h)</h2>
+            <div class="rate"><span>Projektleiter</span><input class="in num" data-sr="0" data-num inputmode="decimal"></div>
+            <div class="rate"><span>Monteure (Montage / IBN)</span><input class="in num" data-sr="1" data-num inputmode="decimal"></div>
+            <div class="rate"><span>Admin</span><input class="in num" data-sr="2" data-num inputmode="decimal"></div>
+            <div class="foot">Gilt für neue Kontrollings und wird im aktuellen Kontrolling aller laufenden Projekte übernommen.</div>
+          </section>
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg></span>Datensicherung</h2>
+            <p class="muted" style="margin:0 0 12px;font-size:13px;line-height:1.5">Die Daten werden nur in diesem Browser gespeichert. Sichere sie regelmässig als Datei (z. B. auf OneDrive oder dem Server), damit nichts verloren geht.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn primary" id="btnExport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3h16v-3"/></svg>Backup speichern</button>
+              <button class="btn" id="btnImport"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 0L8 7m4-4 4 4M4 17v3h16v-3"/></svg>Backup laden</button>
+              <input type="file" id="fileImport" accept=".json,application/json" hidden>
+            </div>
+            <div class="hint mt" id="backupInfo"></div>
+          </section>
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18 3v4h-4M6 21v-4h4"/></svg></span>Automatische Datensicherung
+              <span class="right"><span class="badge grey" id="autoBadge">Aus</span></span></h2>
+            <div id="autoBox"></div>
+          </section>
+        </div>
+        <section class="card">
+          <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></span>Gewerke &amp; Standardpreise</h2>
+          <table class="ct">
+            <colgroup><col><col style="width:130px"><col style="width:26px"></colgroup>
+            <thead><tr><th>Gewerk / Fremdleistung</th><th class="r">Standardpreis CHF</th><th></th></tr></thead>
+            <tbody id="sgBody"></tbody>
+          </table>
+          <button class="btn sm mt" id="btnAddSg"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Gewerk</button>
+          <div class="foot">Diese Gewerke werden bei neuen Projekten mit dem Standardpreis vorausgefüllt. Im Kontrolling kannst du den Standardpreis jederzeit per Klick wieder einsetzen. Leer lassen (0), wenn der Preis variiert.</div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ===== Projekt ===== -->
+    <div id="viewProject" class="view-hidden">
+      <section class="hero">
+        <div>
+          <button class="btn sm" data-nav="dash" style="margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>Dashboard</button>
+          <div class="hi" id="heroSub">–</div>
+          <h1 id="heroName">–</h1>
+        </div>
+        <div class="right"><button class="btn" id="btnClose"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 5 5 9-10"/></svg>Projekt abschliessen</button></div>
+      </section>
+      <div class="banner" id="closedBanner" hidden></div>
+
+      <div class="grid" id="projGrid">
+        <div class="col">
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16v12H4z"/><path d="M9 7V5h6v2"/></svg></span>Projekt
+              <span class="right"><button class="btn icon danger" id="btnDelProj" title="Projekt löschen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></span>
+            </h2>
+            <div class="field"><label class="lbl">Projektname</label><input class="in" data-p="name"></div>
+            <div class="field mt"><label class="lbl">Projekt-Nr.</label><input class="in" data-p="nr"></div>
+            <div class="f2 mt">
+              <div class="field"><label class="lbl">Verkauf VK (CHF)</label><input class="in num" data-p="vk" data-num inputmode="decimal"></div>
+              <div class="field"><label class="lbl">Kosten EK (CHF)</label><input class="in num" data-p="ek" data-num inputmode="decimal"></div>
+            </div>
+            <div class="result"><span class="muted">DB Verkauf = Ziel</span><b id="baseDb">–</b></div>
+            <div class="zl" id="baseZones"></div>
+          </section>
+
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4m6-4v4"/></svg></span>Kontrolling</h2>
+            <div class="weekbar">
+              <div class="field"><label class="lbl">Erfassung</label><select class="in" id="weekSel"></select></div>
+              <button class="btn icon danger" id="btnDelWeek" title="Erfassung löschen" style="width:40px;height:40px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 11v6m4-6v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+            </div>
+            <div class="f2 mt">
+              <div class="field"><label class="lbl">Stichtag</label><input class="in" type="date" data-w="date"></div>
+              <div class="field"><label class="lbl">Aufgelaufene Kosten Ist (CHF)</label><input class="in num" data-w="ist" data-num inputmode="decimal"></div>
+            </div>
+            <div class="inner mt">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div style="font-weight:500">Fortschritt</div>
+                <div class="big"><span id="progVal">0</span><small>%</small></div>
+              </div>
+              <input type="range" min="0" max="100" step="1" class="slider" data-w="progress" id="progSlider">
+              <div class="scale"><span>Start</span><span>Hälfte</span><span>Abschluss</span></div>
+            </div>
+            <div class="field mt"><label class="lbl">Bemerkung / Massnahmen</label><textarea class="in" data-w="note"></textarea></div>
+          </section>
+        </div>
+
+        <div class="col">
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg></span>Noch erwartete Kosten
+              <span class="right muted" style="font-size:13px" id="restHead">–</span></h2>
+            <div class="scroll">
+            <table class="ct">
+              <colgroup><col><col style="width:88px"><col style="width:66px"><col style="width:112px"><col style="width:24px"></colgroup>
+              <thead><tr><th>Gewerke / Fremdleistungen</th><th></th><th class="r">Standard</th><th class="r">CHF</th><th></th></tr></thead>
+              <tbody id="gwBody"></tbody>
+              <tbody>
+                <tr><td colspan="5" style="padding:4px 0 0"><button class="btn sm" id="btnAddGw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>Position</button></td></tr>
+                <tr class="sum"><td colspan="3">Total Gewerke</td><td class="out" id="sumGw" style="color:var(--text)">–</td><td></td></tr>
+              </tbody>
+              <thead><tr><th>Personal</th><th class="r">Ansatz</th><th class="r">Std.</th><th class="r">CHF</th><th></th></tr></thead>
+              <tbody id="peBody"></tbody>
+              <tbody>
+                <tr class="sum"><td colspan="3">Total Personal</td><td class="out" id="sumPe" style="color:var(--text)">–</td><td></td></tr>
+                <tr class="total"><td colspan="3">Total noch erwartet</td><td style="text-align:right" id="sumRest">–</td><td></td></tr>
+              </tbody>
+            </table>
+            </div>
+            <div class="foot">Aufgelaufene Kosten sind im Feld «Ist» erfasst. Hier nur eintragen, was noch kommt.</div>
+          </section>
+        </div>
+
+        <div class="col c3">
+          <section class="card">
+            <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 18a8 8 0 1 1 16 0"/><path d="m12 18 4-6"/></svg></span>DB-Prognose</h2>
+            <div class="gauge"><div id="gauge"></div><div class="c"><div class="v" id="gPct">–</div><div class="s" id="gSub">–</div></div></div>
+            <div class="legend"><span><i style="background:#f2f4f1"></i>DB Verkauf</span><span><i style="background:var(--warn)"></i>½ DB</span></div>
+            <div class="stats">
+              <div class="stat"><div class="l">Endkosten</div><div class="v" id="kEac">–</div></div>
+              <div class="stat"><div class="l">DB Prognose</div><div class="v" id="kDb">–</div></div>
+              <div class="stat"><div class="l">Δ zu Verkauf</div><div class="v" id="kDelta">–</div></div>
+              <div class="stat"><div class="l">Trend nach Fortschritt</div><div class="v" id="kTrend">–</div></div>
+            </div>
+            <div class="hint mt" id="hintText"></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="card" style="margin-top:18px">
+        <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19h16M5 15l4-5 4 3 6-7"/></svg></span>Verlauf · Wo landen die Kosten?</h2>
+        <div class="legend" style="justify-content:flex-start;margin:-6px 0 12px">
+          <span><i style="background:var(--accent)"></i>Aufgelaufene Kosten (Ist)</span>
+          <span><i style="background:#f2f4f1"></i>- - Prognose bis Abschluss</span>
+          <span><i style="background:#8d948f"></i>··· Plan (EK linear)</span>
+          <span><i style="background:var(--accent)"></i>DB erreicht</span>
+          <span><i style="background:var(--warn)"></i>bis ½ DB</span>
+          <span><i style="background:var(--bad)"></i>unter ½ DB</span>
+          <span><i style="background:var(--loss)"></i>Verlust</span>
+        </div>
+        <div class="chart" id="chart"></div>
+        <div class="scroll"><table class="hist" id="hist"></table></div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="panel">
+    <h3>Übersicht</h3>
+    <div class="ov-sum" id="ovSum"></div>
+    <div class="stack" id="ovBar"></div>
+    <div class="lbl" style="margin:4px 4px 0">Laufende Projekte · kritischste zuerst</div>
+    <div id="sideList" style="display:flex;flex-direction:column;gap:8px"></div>
+    <a href="#" data-nav="list" class="muted" id="ovClosed" style="font-size:12px;text-align:center;text-decoration:none"></a>
+  </aside>
+</div>
+
+<div class="modal" id="closeModal" hidden><div class="card mbox">
+  <h2><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 5 5 9-10"/></svg></span>Projekt abschliessen</h2>
+  <p class="muted" style="margin:-6px 0 14px;font-size:13px">Schlussabrechnung erfassen. Das Projekt wird danach unter «Abgeschlossen» geführt.</p>
+  <div class="f2">
+    <div class="field"><label class="lbl">Abschlussdatum</label><input class="in" type="date" id="mDate"></div>
+    <div class="field"><label class="lbl">Schluss-VK inkl. Nachträge (CHF)</label><input class="in num" id="mVk" inputmode="decimal"></div>
+  </div>
+  <div class="f2 mt">
+    <div class="field"><label class="lbl">Endkosten (CHF)</label><input class="in num" id="mCost" inputmode="decimal"></div>
+    <div class="field"><label class="lbl">End-DB (%)</label><input class="in num" id="mPct" inputmode="decimal"></div>
+  </div>
+  <div class="hint mt" id="mInfo"></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px"><button class="btn" id="mCancel">Abbrechen</button><button class="btn primary" id="mOk">Abschliessen</button></div>
+</div></div>
+<div class="toast" id="toast"></div>
+<div id="printArea"></div>
+
+<script>
+const LS = 'projektkontrolling.v1';
+const PERSONAL = ['Projektleiter', 'Montage / IBN', 'Admin'];
+const defSettings = () => ({
+  pl: 'Nicola Jundt', rates: [120, 85, 70], lastBackup: null, auto: { mode: 'off', file: '', last: null },
+  gewerke: ['Elektriker', 'ToiToi', 'Gerüst', 'Gärtner', 'Maler', 'Unabhängige Kontrolle', 'Blitzschutzabnahme', 'Transport', 'Kran', 'Bestellungen', 'Abdichtung / Brandschottung'].map(name => ({ name, price: 0 }))
+});
+function normSettings(s) {
+  const d = defSettings(); if (!s) return d;
+  return { pl: s.pl ?? d.pl, rates: Array.isArray(s.rates) && s.rates.length === 3 ? s.rates : d.rates,
+    gewerke: Array.isArray(s.gewerke) ? s.gewerke : d.gewerke, lastBackup: s.lastBackup || null, auto: s.auto || d.auto };
+}
+
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(String(v ?? '').replace(/['’\s]/g, '').replace(',', '.')); return isFinite(n) ? n : 0; };
+const fmt = n => Math.round(n).toLocaleString('de-CH');
+const chf = n => 'CHF ' + fmt(n);
+const pct = (n, d = 1) => n == null || !isFinite(n) ? '–' : n.toFixed(d) + '%';
+const sgn = (n, unit = ' Pp') => n == null || !isFinite(n) ? '–' : (n >= 0 ? '+' : '−') + Math.abs(n).toFixed(1) + unit;
+const sgnChf = n => (n >= 0 ? '+' : '−') + 'CHF ' + fmt(Math.abs(n));
+const ymdLocal = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const today = () => ymdLocal(new Date());
+function dmy(ds) { if (!ds) return '–'; const [y, m, d] = ds.split('-'); return `${d}.${m}.${y}`; }
+function isoWeek(ds) {
+  const d = new Date(ds + 'T00:00:00'); if (isNaN(d)) return null;
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return [t.getUTCFullYear(), Math.ceil(((t - y0) / 864e5 + 1) / 7)];
+}
+function kw(ds) { const r = isoWeek(ds); return r ? r[1] : '–'; }
+
+/* ---------- data ---------- */
+let db = { settings: defSettings(), projects: [], activeId: null };
+const S = () => db.settings;
+function newWeek(prev) {
+  const w = prev ? JSON.parse(JSON.stringify(prev)) : { ist: 0, progress: 0, note: '',
+    gewerke: S().gewerke.filter(g => g.name).map(g => ({ name: g.name, amount: num(g.price), fixed: true })),
+    personal: PERSONAL.map(name => ({ name, rate: 0, hours: 0 })) };
+  w.id = uid(); w.date = today();
+  w.personal.forEach((x, i) => { if (i < 3) x.rate = num(S().rates[i]); });
+  return w;
+}
+function newProject() {
+  const w = newWeek();
+  return { id: uid(), name: 'Neues Projekt', nr: '', vk: 0, ek: 0, ziel: 0, weeks: [w], wid: w.id };
+}
+function demoProjects() {
+  const amounts = { 'Elektriker': 18000, 'ToiToi': 400, 'Gerüst': 3500, 'Maler': 6200, 'Unabhängige Kontrolle': 900, 'Blitzschutzabnahme': 650, 'Transport': 1200, 'Kran': 2400, 'Bestellungen': 9800, 'Abdichtung / Brandschottung': 2100 };
+  const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return ymdLocal(d); };
+  const mk = (date, ist, progress, f, hrs, note) => {
+    const w = newWeek(); w.date = date; w.ist = ist; w.progress = progress; w.note = note;
+    w.gewerke.forEach(g => { g.amount = Math.round((amounts[g.name] || 0) * f / 50) * 50; });
+    w.personal.forEach((p, i) => p.hours = hrs[i]);
+    return w;
+  };
+  const p = { id: uid(), name: 'Beispiel MFH Seestrasse', nr: 'P-2026-114', vk: 185000, ek: 148000, ziel: 24, weeks: [
+    mk(ago(14), 42000, 28, 1.8, [60, 180, 18], 'Projektstart, Material grösstenteils bestellt.'),
+    mk(ago(7), 61000, 40, 1.378, [50, 150, 15], 'Gerüst früher abgebaut, Kran nur 2 statt 3 Tage.'),
+    mk(ago(0), 78500, 54, 1, [40, 120, 12], 'Elektro-Offerte nachverhandelt (−CHF 3\'000).')] };
+  p.wid = p.weeks[2].id;
+  const q = { id: uid(), name: 'Beispiel Schulhaus Nord', nr: 'P-2026-098', vk: 96000, ek: 79000, ziel: 20, weeks: [
+    mk(ago(16), 30000, 30, 0.8, [30, 110, 8], 'Mehraufwand Brandschottung.'),
+    mk(ago(9), 47000, 42, 0.5, [26, 95, 6], 'Nachtrag noch nicht vom Kunden bestätigt.')] };
+  q.wid = q.weeks[1].id;
+  const r = { id: uid(), name: 'Beispiel EFH Bergweg', nr: 'P-2026-121', vk: 52000, ek: 41000, weeks: [
+    mk(ago(10), 18000, 35, 0.38, [16, 90, 6], 'Zusatzaufwand Montage.'),
+    mk(ago(3), 30000, 60, 0.242, [10, 60, 4], 'Regiestunden nicht verrechenbar.')] };
+  r.wid = r.weeks[1].id;
+  return [p, q, r];
+}
+(function load() {
+  try {
+    const s = localStorage.getItem(LS);
+    if (s) { const d = JSON.parse(s); if (d && Array.isArray(d.projects)) { d.settings = normSettings(d.settings); db = d; return; } }
+  } catch (e) {}
+  db.projects = demoProjects();
+})();
+let saveT;
+function storeLocal() { try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) { toast('Speichern im Browser nicht möglich – bitte Backup speichern'); } }
+function save() { storeLocal(); queueAuto(); }
+function queueSave() { clearTimeout(saveT); saveT = setTimeout(save, 300); }
+
+const cur = () => db.projects.find(p => p.id === db.activeId) || db.projects[0];
+const sortedWeeks = p => [...p.weeks].sort((a, b) => a.date.localeCompare(b.date));
+const latest = p => { const s = sortedWeeks(p); return s[s.length - 1]; };
+const curWeek = (p = cur()) => p && (p.weeks.find(w => w.id === p.wid) || latest(p));
+
+/* ---------- calculations ---------- */
+function calc(p, w) {
+  const vk = num(p.vk), ek = num(p.ek), ziel = num(p.ziel);
+  const dbPlan = vk - ek, dbPlanPct = vk ? dbPlan / vk * 100 : null;
+  const restGw = w ? w.gewerke.reduce((s, g) => s + num(g.amount), 0) : 0;
+  const restPe = w ? w.personal.reduce((s, x) => s + num(x.rate) * num(x.hours), 0) : 0;
+  const ist = w ? num(w.ist) : 0, prog = w ? num(w.progress) : 0;
+  const rest = restGw + restPe, eac = ist + rest;
+  const dbProg = vk - eac, dbProgPct = vk ? dbProg / vk * 100 : null;
+  const eacTrend = prog > 0 ? ist / (prog / 100) : null;
+  const dbTrendPct = eacTrend != null && vk ? (vk - eacTrend) / vk * 100 : null;
+  return { vk, ek, ziel, dbPlan, dbPlanPct, restGw, restPe, rest, ist, prog, eac, dbProg, dbProgPct, eacTrend, dbTrendPct,
+    deltaPlan: dbProgPct != null && dbPlanPct != null ? dbProgPct - dbPlanPct : null,
+    deltaZiel: dbProgPct != null && ziel ? dbProgPct - ziel : null,
+    deltaChf: dbProg - dbPlan };
+}
+// Ampel: grün = DB Verkauf erreicht, orange = bis zur Hälfte, rot = unter der Hälfte, Verlust = DB negativ
+const LBL = { '': 'Gut', w: 'Achtung', b: 'Kritisch', x: 'Verlust', n: 'Daten fehlen' };
+const RANK = { x: 0, b: 1, w: 2, n: 3, '': 4 };
+const TILE = { w: 'warn', b: 'bad', x: 'loss' };
+const TXT = { '': 'pos', w: 'wrn', b: 'neg', x: 'neg', n: '' };
+function classify(dbChf, planChf) {
+  if (dbChf >= planChf) return '';
+  if (dbChf < 0) return 'x';
+  return dbChf >= planChf / 2 ? 'w' : 'b';
+}
+function status(c) {
+  if (c.dbProgPct == null || !c.ek) return { cls: 'n', lbl: LBL.n, txt: 'VK und EK erfassen' };
+  const cls = classify(c.dbProg, c.dbPlan);
+  return { cls, lbl: LBL[cls], txt: `${LBL[cls]} · DB ${pct(c.dbProgPct)} statt ${pct(c.dbPlanPct)} (${sgnChf(c.deltaChf)})` };
+}
+
+/* ---------- svg ---------- */
+function polar(cx, cy, r, deg) { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; }
+function arc(cx, cy, r, a0, a1) {
+  const [x0, y0] = polar(cx, cy, r, a0), [x1, y1] = polar(cx, cy, r, a1);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function gaugeSVG(size, val, max, color, marks, sw, anim, zones) {
+  const da = anim ? ' pathLength="1" class="draw"' : '';
+  const cx = size / 2, cy = size / 2, r = size / 2 - sw - 6, A0 = -135, SW = 270;
+  const f = Math.max(0, Math.min(1, (val ?? 0) / max)), a1 = A0 + SW * f, gid = 'g' + uid();
+  let s = `<svg viewBox="0 0 ${size} ${size}"><defs><linearGradient id="${gid}" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="${color[0]}" stop-opacity=".35"/><stop offset="1" stop-color="${color[1]}"/></linearGradient>
+    <filter id="${gid}f" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter></defs>
+    <path d="${arc(cx, cy, r, A0, A0 + SW)}" stroke="rgba(255,255,255,.08)" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+  (zones || []).forEach(z => {
+    const a = A0 + SW * Math.max(0, Math.min(1, z.from / max)), b = A0 + SW * Math.max(0, Math.min(1, z.to / max));
+    if (b - a > 0.5) s += `<path d="${arc(cx, cy, r, a, b)}" stroke="${z.c}" stroke-opacity=".22" stroke-width="${sw}" fill="none"/>`;
+  });
+  if (f > 0.004) {
+    s += `<path d="${arc(cx, cy, r, A0, a1)}" stroke="${color[1]}" stroke-opacity=".45" stroke-width="${sw}" fill="none" stroke-linecap="round" filter="url(#${gid}f)"${da}/>
+      <path d="${arc(cx, cy, r, A0, a1)}" stroke="url(#${gid})" stroke-width="${sw}" fill="none" stroke-linecap="round"${da}/>`;
+    const [kx, ky] = polar(cx, cy, r, a1);
+    s += `<circle cx="${kx}" cy="${ky}" r="${sw * .62}" fill="${color[1]}" stroke="rgba(0,0,0,.35)" stroke-width="2"${anim ? ' class="pop"' : ''}/>`;
+  }
+  (marks || []).forEach(m => {
+    if (m.v == null || !isFinite(m.v)) return;
+    const a = A0 + SW * Math.max(0, Math.min(1, m.v / max));
+    const [x0, y0] = polar(cx, cy, r - sw / 2 - 3, a), [x1, y1] = polar(cx, cy, r + sw / 2 + 5, a);
+    s += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${m.c}" stroke-width="3" stroke-linecap="round"/>`;
+  });
+  return s + '</svg>';
+}
+const niceStep = v => { const m = 10 ** Math.floor(Math.log10(v || 1)), r = v / m; return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 5 ? 5 : 10) * m; };
+const kchf = n => Math.abs(n) >= 1000 ? Math.round(n / 1000) + 'k' : fmt(n);
+// Verlauf: x = Fortschritt, y = Kosten. Ist-Linie über die Wochen, gestrichelt die Prognose bis Abschluss,
+// rechts die «Landezone» (grün bis EK, orange bis ½ DB, rot bis VK, darüber Verlust).
+function chartSVG(p, th, H = 270, anim = false, wSel = latest(p)) {
+  const W = 760, L = 50, R = 150, T = 20, B = 38, iw = W - L - R, ih = H - T - B;
+  const base = calc(p, null), cs = calc(p, wSel), st = status(cs), vk = base.vk, ek = base.ek, half = ek + base.dbPlan / 2;
+  const ws = sortedWeeks(p).filter(w => w.date <= wSel.date);
+  const top = Math.max(vk, cs.eac, ...ws.map(w => calc(p, w).eac), 1) * 1.08;
+  const x = v => L + Math.max(0, Math.min(100, v)) / 100 * iw, y = v => T + (1 - Math.max(0, v) / top) * ih;
+  const sx = x(100) + 14, txt = (X, Y, t, o = '') => `<text x="${X}" y="${Y}" ${o} stroke="${th.bg}" stroke-width="4" paint-order="stroke">${t}</text>`;
+  let s = `<svg viewBox="0 0 ${W} ${H}" font-family="Outfit,Arial,sans-serif">`;
+  if (vk > 0 && ek > 0) [[0, ek, th.st['']], [ek, Math.max(ek, half), th.st.w], [Math.max(ek, half), Math.max(vk, ek), th.st.b], [Math.max(vk, ek), top, th.st.x]].forEach(([a, b, c]) => {
+    if (b > a) s += `<rect x="${L}" y="${y(b)}" width="${iw}" height="${y(a) - y(b)}" fill="${c}" opacity="${th.band}"/><rect x="${sx}" y="${y(b)}" width="10" height="${y(a) - y(b)}" fill="${c}" opacity=".9"/>`;
+  });
+  const step = niceStep(top / 5);
+  for (let v = 0; v <= top; v += step) s += `<line x1="${L}" x2="${x(100)}" y1="${y(v)}" y2="${y(v)}" stroke="${th.grid}"/><text x="${L - 8}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="${th.muted}">${kchf(v)}</text>`;
+  [0, 25, 50, 75, 100].forEach(v => s += `<text x="${x(v)}" y="${H - 20}" text-anchor="middle" font-size="11" fill="${th.muted}">${v}%</text>`);
+  s += `<text x="${x(50)}" y="${H - 5}" text-anchor="middle" font-size="10.5" fill="${th.muted}">Leistungsfortschritt</text>`;
+  if (vk) s += `<line x1="${L}" x2="${sx + 10}" y1="${y(vk)}" y2="${y(vk)}" stroke="${th.text}" stroke-width="1.4" stroke-dasharray="6 4" opacity=".75"/>` + txt(sx + 16, y(vk) + 4, `Verkauf ${kchf(vk)}`, `font-size="11" fill="${th.text}"`);
+  if (ek) { const ly = Math.abs(y(ek) - y(vk)) < 14 ? y(vk) + 15 : y(ek) + 4;
+    s += `<line x1="${L}" x2="${sx + 10}" y1="${y(ek)}" y2="${y(ek)}" stroke="${th.plan}" stroke-width="1.2" stroke-dasharray="3 4"/>` + txt(sx + 16, ly, `EK ${kchf(ek)}`, `font-size="11" fill="${th.muted}"`);
+    s += `<line x1="${x(0)}" y1="${y(0)}" x2="${x(100)}" y2="${y(ek)}" stroke="${th.plan}" stroke-width="1.3" stroke-dasharray="2 4"/>`; }
+  const pts = [[x(0), y(0)]].concat(ws.map(w => { const c = calc(p, w); return [x(c.prog), y(c.ist)]; }));
+  s += `<path d="M${pts.map(q => q.join(' ')).join(' L')} L${pts[pts.length - 1][0]} ${y(0)} Z" fill="${th.acc}" opacity=".12"${anim ? ' class="fade"' : ''}/>`;
+  s += `<polyline points="${pts.map(q => q.join(',')).join(' ')}" fill="none" stroke="${th.acc}" stroke-width="2.6" stroke-linejoin="round"${anim ? ' pathLength="1" class="draw"' : ''}/>`;
+  ws.forEach(w => { if (w.id === wSel.id) return; const c = calc(p, w);
+    s += `<circle cx="${x(c.prog)}" cy="${y(c.ist)}" r="3.5" fill="${th.acc}"/><circle cx="${x(100)}" cy="${y(c.eac)}" r="3" fill="none" stroke="${th.muted}" stroke-width="1.3"/>`; });
+  const col = th.st[st.cls], cx0 = x(cs.prog), cy0 = y(cs.ist), lx = x(100), ly = y(cs.eac);
+  s += `<line x1="${cx0}" y1="${cy0}" x2="${lx}" y2="${ly}" stroke="${col}" stroke-width="2.4" stroke-dasharray="7 5"${anim ? ' class="fade"' : ''}/>`;
+  s += `<circle cx="${cx0}" cy="${cy0}" r="5.5" fill="${th.bg}" stroke="${th.acc}" stroke-width="2.6"/>` + txt(cx0, cy0 + (cy0 > T + ih - 30 ? -12 : 20), `Ist ${kchf(cs.ist)} · ${cs.prog}%`, `text-anchor="middle" font-size="11" fill="${th.text}"`);
+  s += `<circle cx="${lx}" cy="${ly}" r="7.5" fill="${col}" stroke="${th.bg}" stroke-width="2.5"${anim ? ' class="pop"' : ''}/>`;
+  s += txt(lx - 12, vk && Math.abs(ly - 12 - y(vk)) < 12 ? ly + 22 : ly - 12, `Landung ${chf(cs.eac)} · DB ${pct(cs.dbProgPct)}`, `text-anchor="end" font-size="12" font-weight="600" fill="${col}"`);
+  return s + '</svg>';
+}
+const DARK = { id: 'd', acc: '#a9d6a1', plan: '#8d948f', grid: 'rgba(255,255,255,.06)', muted: '#8f9792', text: '#eef1ee', bg: '#22272a', band: .07,
+  st: { '': '#a9d6a1', w: '#e9bb6c', b: '#ec7259', x: '#ff3b3b', n: '#8d948f' } };
+const LIGHT = { id: 'l', acc: '#4f9a48', plan: '#888', grid: '#e8ebe8', muted: '#777', text: '#222', bg: '#fff', band: .1,
+  st: { '': '#4f9a48', w: '#d08a14', b: '#d9502f', x: '#a3121a', n: '#888' } };
+const GC = { '': ['#a9d6a1', '#d3edcd'], w: ['#e9bb6c', '#f2cc85'], b: ['#ec7259', '#f39a85'], x: ['#ff3b3b', '#ff6b6b'], n: ['#8d948f', '#b0b6b2'] };
+
+/* ---------- views ---------- */
+let view = 'dash', listFilter = 'run', animNext = false;
+const VIEWS = { dash: 'viewDash', list: 'viewList', settings: 'viewSettings', proj: 'viewProject' };
+function showView(v) {
+  view = v;
+  Object.entries(VIEWS).forEach(([k, id]) => $(id).classList.toggle('view-hidden', k !== v));
+  document.querySelectorAll('.side [data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === v));
+  $('btnPdf').classList.toggle('view-hidden', v !== 'proj');
+  if (v === 'proj') { animNext = true; renderForm(); }
+  else { if (v === 'dash') renderDash(true); if (v === 'list') renderList(); if (v === 'settings') renderSettings(); renderPortfolioPill(); renderSide(); }
+  animateIn($(VIEWS[v]));
+  window.scrollTo(0, 0);
+}
+// Mikroanimationen: Karten gestaffelt einblenden, Zahlen hochzählen
+function animateIn(el) {
+  el.classList.remove('enter'); void el.offsetWidth;
+  el.querySelectorAll('.card,.ptile,.due').forEach((c, i) => c.style.setProperty('--d', Math.min(i, 14) * 45 + 'ms'));
+  el.classList.add('enter');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('enter'), 1400);
+}
+function countUp(el, to, f, ms = 850) {
+  if (to == null || !isFinite(to)) return;
+  const t0 = performance.now();
+  const step = t => { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); el.innerHTML = f(to * e); if (k < 1) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+const activeP = () => db.projects.filter(p => !p.closed);
+const closedP = () => db.projects.filter(p => p.closed);
+const sameWeek = (a, b) => String(isoWeek(a)) === String(isoWeek(b));
+const daysSince = ds => Math.round((new Date(today() + 'T00:00:00') - new Date(ds + 'T00:00:00')) / 864e5);
+const isDue = p => !p.closed && !sameWeek(latest(p).date, today());
+const matches = p => { const q = $('search').value.trim().toLowerCase(); return !q || [p.name, p.nr].join(' ').toLowerCase().includes(q); };
+function info(p) { const w = latest(p), c = calc(p, w); return { p, w, c, st: status(c), due: isDue(p) }; }
+function lastTxt(x) { const d = daysSince(x.w.date); return d <= 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`; }
+
+// Projekt öffnen: in einer neuen KW wird ein neues Kontrolling mit den Werten vom letzten Mal angelegt
+function startControl(id) {
+  const p = db.projects.find(x => x.id === id); if (!p) return;
+  db.activeId = p.id;
+  const last = latest(p), t = today();
+  if (p.closed) p.wid = last.id;
+  else if (sameWeek(last.date, t)) { if (last.date < t) last.date = t; p.wid = last.id; }
+  else { const w = newWeek(last); p.weeks.push(w); p.wid = w.id; toast(`Kontrolling KW ${kw(t)} gestartet – Werte vom ${dmy(last.date)} übernommen`); }
+  save(); showView('proj');
+}
+function newProj() {
+  const p = newProject(); db.projects.unshift(p); db.activeId = p.id; save(); showView('proj');
+  const n = document.querySelector('[data-p="name"]'); n.focus(); n.select();
+}
+
+/* ---------- project view ---------- */
+function renderForm() {
+  const p = cur(), w = curWeek(p);
+  document.querySelectorAll('[data-p]').forEach(el => {
+    const v = p[el.dataset.p];
+    el.value = el.hasAttribute('data-num') ? (num(v) ? (el.dataset.p === 'ziel' ? String(num(v)) : fmt(num(v))) : '') : (v ?? '');
+  });
+  document.querySelectorAll('[data-w]').forEach(el => {
+    const v = w[el.dataset.w]; el.value = el.hasAttribute('data-num') ? (num(v) ? fmt(num(v)) : '') : (v ?? '');
+  });
+  renderWeekSel(); renderCostRows(); renderOutputs();
+}
+function renderWeekSel() {
+  const p = cur(), w = curWeek(p);
+  $('weekSel').innerHTML = sortedWeeks(p).reverse().map(x => `<option value="${x.id}" ${x.id === w.id ? 'selected' : ''}>KW ${kw(x.date)} · ${dmy(x.date)}</option>`).join('');
+}
+const stdPrice = name => { const g = S().gewerke.find(g => g.name === name); return g ? num(g.price) : 0; };
+function renderCostRows() {
+  const w = curWeek();
+  $('gwBody').innerHTML = w.gewerke.map((g, i) => {
+    const sp = stdPrice(g.name);
+    return `<tr class="row">
+      <td class="n" colspan="2">${g.fixed ? esc(g.name) : `<input class="in name" data-g="${i}" data-gf="name" value="${esc(g.name)}" placeholder="Weitere Position …">`}</td>
+      <td>${sp ? `<button class="std ${num(g.amount) === sp ? 'same' : ''}" data-std="${i}" title="Standardpreis einsetzen">${fmt(sp)}</button>` : ''}</td>
+      <td><input class="in num amt" data-g="${i}" data-gf="amount" data-num inputmode="decimal" value="${num(g.amount) ? fmt(g.amount) : ''}" placeholder="0"></td>
+      <td>${g.fixed ? '' : `<button class="x" data-delg="${i}" title="Entfernen">×</button>`}</td></tr>`;
+  }).join('');
+  $('peBody').innerHTML = w.personal.map((x, i) => `<tr class="row">
+      <td class="n">${esc(x.name)}</td>
+      <td class="out">${fmt(x.rate)}/h</td>
+      <td><input class="in num amt" data-pe="${i}" data-pf="hours" data-num inputmode="decimal" value="${num(x.hours) || ''}" placeholder="0"></td>
+      <td class="out" id="pt${i}">–</td><td></td></tr>`).join('');
+}
+function renderOutputs() {
+  const p = cur(), w = curWeek(p), c = calc(p, w), st = status(c);
+  $('heroSub').textContent = (p.nr ? p.nr + ' · ' : '') + `Kontrolling KW ${kw(w.date)} · ${dmy(w.date)}`;
+  $('heroName').textContent = p.name || 'Unbenanntes Projekt';
+  $('statusText').textContent = st.txt;
+  $('statusPill').className = 'pill status ' + ({ w: 'warn', n: 'warn', b: 'bad', x: 'loss' }[st.cls] || '');
+  $('baseDb').textContent = `${pct(c.dbPlanPct)} · ${chf(c.dbPlan)}`;
+  $('baseZones').innerHTML = c.vk && c.ek ? `<span><span class="dot"></span>Gut ab ${chf(c.dbPlan)}</span><span><span class="dot w"></span>Achtung ab ${chf(c.dbPlan / 2)}</span><span><span class="dot b"></span>Kritisch darunter</span><span><span class="dot x"></span>Verlust unter 0</span>` : '';
+  $('progVal').textContent = c.prog;
+  $('progSlider').style.setProperty('--v', c.prog + '%');
+  w.personal.forEach((x, i) => { const el = $('pt' + i); if (el) el.textContent = fmt(num(x.rate) * num(x.hours)); });
+  w.gewerke.forEach((g, i) => { const b = document.querySelector(`[data-std="${i}"]`); if (b) b.classList.toggle('same', num(g.amount) === stdPrice(g.name)); });
+  $('sumGw').textContent = fmt(c.restGw); $('sumPe').textContent = fmt(c.restPe); $('sumRest').textContent = fmt(c.rest);
+  $('restHead').textContent = chf(c.rest);
+  const plan = c.dbPlanPct || 0, gMax = Math.max(30, Math.ceil((Math.max(plan, c.dbProgPct || 0) + 8) / 10) * 10);
+  const zones = plan > 0 ? [{ from: 0, to: plan / 2, c: DARK.st.b }, { from: plan / 2, to: plan, c: DARK.st.w }, { from: plan, to: gMax, c: DARK.st[''] }] : [];
+  const an = animNext; animNext = false;
+  $('gauge').innerHTML = gaugeSVG(240, c.dbProgPct, gMax, GC[st.cls], [{ v: c.dbPlanPct, c: '#f2f4f1' }, { v: plan / 2 || null, c: DARK.st.w }], 15, an, zones);
+  $('gPct').innerHTML = c.dbProgPct == null ? '–' : `${c.dbProgPct.toFixed(1)}<small>%</small>`;
+  if (an) countUp($('gPct'), c.dbProgPct, v => `${v.toFixed(1)}<small>%</small>`, 1100);
+  $('gPct').className = 'v ' + (st.cls === 'x' ? 'neg' : '');
+  $('gSub').innerHTML = `<b class="${TXT[st.cls]}">${st.lbl}</b> · verkauft mit ${pct(c.dbPlanPct)}`;
+  $('kEac').textContent = chf(c.eac);
+  $('kDb').textContent = chf(c.dbProg); $('kDb').className = 'v ' + TXT[st.cls];
+  setSign($('kDelta'), c.deltaChf, sgnChf(c.deltaChf));
+  setSign($('kTrend'), c.dbTrendPct == null || c.dbPlanPct == null ? null : c.dbTrendPct - c.dbPlanPct, pct(c.dbTrendPct));
+  $('hintText').innerHTML = hint(c);
+  $('chart').innerHTML = chartSVG(p, DARK, 270, an, w);
+  renderHist();
+  const cb = $('closedBanner');
+  if (p.closed) {
+    const e = p.closed.vk - p.closed.cost, d = e - c.dbPlan, k = classify(e, c.dbPlan); cb.hidden = false;
+    cb.innerHTML = `<span>✓ Abgeschlossen am <b>${dmy(p.closed.date)}</b> · End-DB <b class="${TXT[k]}">${pct(p.closed.dbPct)}</b> (${chf(e)}) · <span class="${TXT[k]}">${LBL[k]}, ${sgnChf(d)} zu Verkauf</span></span><button class="btn sm" id="btnReopen">Wieder öffnen</button>`;
+  } else cb.hidden = true;
+  $('projGrid').classList.toggle('locked', !!p.closed);
+  $('btnClose').classList.toggle('view-hidden', !!p.closed);
+  renderSide();
+}
+function setSign(el, v, txt) { el.textContent = txt; el.className = 'v ' + (v == null || !isFinite(v) ? '' : v >= 0 ? 'pos' : 'neg'); }
+function hint(c) {
+  if (!c.vk || !c.ek) return 'Zuerst Verkauf (VK) und Kosten (EK) erfassen.';
+  if (!c.prog) return 'Fortschritt setzen, damit der Trend berechnet wird.';
+  const gap = c.dbProgPct - c.dbTrendPct;
+  if (gap > 3) return `<span class="wrn">⚠ Prüfen:</span> Nach Fortschritt (Ist ÷ ${c.prog}%) wären es nur ${pct(c.dbTrendPct)}. Sind alle kommenden Rechnungen erfasst?`;
+  if (gap < -3) return `<span class="pos">✓</span> Der Trend liegt über der Prognose – die Restkosten sind eher vorsichtig geschätzt.`;
+  return `<span class="pos">✓</span> Prognose und Trend passen zusammen.`;
+}
+function renderHist() {
+  const p = cur(), w = curWeek(p);
+  const rows = sortedWeeks(p).reverse().map(x => { const c = calc(p, x), k = TXT[status(c).cls]; return `<tr data-wid="${x.id}" class="${x.id === w.id ? 'cur' : ''}">
+    <td>KW ${kw(x.date)} · ${dmy(x.date)}</td><td>${c.prog}%</td><td>${fmt(c.ist)}</td><td>${fmt(c.rest)}</td><td><b style="font-weight:500">${fmt(c.eac)}</b></td>
+    <td class="${k}">${pct(c.dbProgPct)}</td><td class="${k}">${sgnChf(c.deltaChf)}</td></tr>`; }).join('');
+  $('hist').innerHTML = `<thead><tr><th>Erfassung</th><th>Fortschritt</th><th>Ist CHF</th><th>+ noch kommt CHF</th><th>= Landung CHF</th><th>DB</th><th>Δ zu Verkauf</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+/* ---------- dashboard ---------- */
+const ADD_TILE = `<div class="ptile add" id="newProjTile"><div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><div>Neues Projekt</div></div></div>`;
+function tileHTML(x) {
+  const head = `<div class="t">${esc(x.p.name || 'Unbenannt')}</div><div class="s">${esc(x.p.nr || '—')}</div>`;
+  if (x.p.closed) {
+    const cd = x.p.closed, e = cd.vk - cd.cost, k = TXT[classify(e, x.c.dbPlan)];
+    return `<div class="ptile done" data-start="${x.p.id}"><span class="dot g"></span>${head}
+      <div class="row"><span class="db ${k}">${pct(cd.dbPct)}</span><span class="s ${k}">${sgnChf(e - x.c.dbPlan)}</span></div>
+      <div class="bar"><i style="width:100%;background:var(--dim)"></i></div>
+      <div class="tf"><span>End-DB · VK ${fmt(cd.vk)}</span><span class="badge grey">✓ ${dmy(cd.date)}</span></div></div>`;
+  }
+  const k = x.st.cls;
+  const badge = k === 'x' ? '<span class="badge loss">⚠ Verlust</span>' : x.due ? '<span class="badge">fällig</span>' : k === 'b' ? '<span class="badge red">Kritisch</span>' : `<span class="badge ok">✓ KW ${kw(today())}</span>`;
+  return `<div class="ptile ${TILE[k] || ''}" data-start="${x.p.id}"><span class="dot ${k}"></span>${head}
+    <div class="row"><span class="db">${pct(x.c.dbProgPct)}</span><span class="s ${TXT[k]}">${x.st.lbl} · ${sgnChf(x.c.deltaChf)}</span></div>
+    <div class="bar"><i style="width:${x.c.prog}%"></i></div>
+    <div class="tf"><span>${x.c.prog}% · ${lastTxt(x)}</span>${badge}</div></div>`;
+}
+const countCls = xs => { const n = {}; xs.forEach(x => n[x.st.cls] = (n[x.st.cls] || 0) + 1); return n; };
+function riskText(n) { return [['x', 'Verlust'], ['b', 'kritisch'], ['w', 'Achtung']].filter(([k]) => n[k]).map(([k, l]) => `${n[k]} ${l}`).join(' · '); }
+function renderPortfolioPill() {
+  const xs = activeP().map(info), due = xs.filter(x => x.due).length, n = countCls(xs);
+  $('statusText').textContent = [due ? `${due} zu kontrollieren` : '', riskText(n) || 'alle Projekte gut'].filter(Boolean).join(' · ');
+  $('statusPill').className = 'pill status ' + (n.x ? 'loss' : n.b ? 'bad' : n.w || due ? 'warn' : '');
+}
+function renderDash(anim) {
+  const h = new Date().getHours();
+  $('greetD').textContent = (h < 11 ? 'Guten Morgen' : h < 18 ? 'Guten Tag' : 'Guten Abend') + ',';
+  $('greetName').textContent = (S().pl || '').split(' ')[0] || 'Übersicht';
+  $('dKw').innerHTML = `KW <b>${kw(today())}</b> · ${dmy(today())}`;
+  const xs = activeP().map(info);
+  const vk = xs.reduce((s, x) => s + x.c.vk, 0), dbPlan = xs.reduce((s, x) => s + x.c.dbPlan, 0), dbProg = xs.reduce((s, x) => s + x.c.dbProg, 0);
+  const due = xs.filter(x => x.due), n = countCls(xs);
+  const pp = vk ? dbProg / vk * 100 : null, pl = vk ? dbPlan / vk * 100 : null, pk = classify(dbProg, dbPlan);
+  $('dActive').textContent = xs.length; $('dActive').className = 'v';
+  $('dActiveS').innerHTML = riskText(n) ? `<span class="${n.x || n.b ? 'neg' : 'wrn'}">${riskText(n)}</span>` : 'alle Projekte gut';
+  $('dVk').textContent = chf(vk); $('dVkS').textContent = `DB Verkauf ${chf(dbPlan)}`;
+  $('dDb').textContent = pct(pp); $('dDb').className = 'v ' + (pp == null ? '' : TXT[pk]);
+  $('dDbS').textContent = `Verkauf ${pct(pl)} · ${sgnChf(dbProg - dbPlan)}`;
+  $('dDue').textContent = due.length; $('dDue').className = 'v ' + (due.length ? 'wrn' : 'pos');
+  $('dDueS').textContent = due.length ? 'Ist & kommende Rechnungen erfassen' : 'Alles kontrolliert';
+  $('dDueL').textContent = `Zu kontrollieren · KW ${kw(today())}`;
+  if (anim) {
+    countUp($('dActive'), xs.length, v => Math.round(v)); countUp($('dVk'), vk, chf);
+    if (pp != null) countUp($('dDb'), pp, v => pct(v)); countUp($('dDue'), due.length, v => Math.round(v));
+  }
+  $('dueList').innerHTML = due.length ? due.sort((a, b) => a.w.date.localeCompare(b.w.date)).map(x => `<div class="due ${daysSince(x.w.date) > 13 ? 'late' : ''}"><span class="dot ${x.st.cls}"></span>
+      <div style="min-width:0"><div class="t">${esc(x.p.name || 'Unbenannt')}</div><div class="s">Letzte Kontrolle ${dmy(x.w.date)} · ${lastTxt(x)}</div></div>
+      <button class="btn sm" data-start="${x.p.id}">Kontrollieren →</button></div>`).join('')
+    : '<div class="empty">✓ Alle laufenden Projekte sind diese Woche kontrolliert.</div>';
+  const list = xs.filter(x => matches(x.p)).sort((a, b) => RANK[a.st.cls] - RANK[b.st.cls] || b.due - a.due || (a.p.name || '').localeCompare(b.p.name || ''));
+  $('projTiles').innerHTML = list.map(tileHTML).join('') + ADD_TILE;
+}
+
+/* ---------- alle Projekte ---------- */
+const FILTERS = [
+  ['all', 'Alle', () => true], ['run', 'Laufend', x => !x.p.closed], ['due', 'Fällig', x => x.due],
+  ['good', 'Gut', x => !x.p.closed && x.st.cls === ''], ['warn', 'Achtung', x => !x.p.closed && x.st.cls === 'w'],
+  ['crit', 'Kritisch / Verlust', x => !x.p.closed && (x.st.cls === 'b' || x.st.cls === 'x')], ['done', 'Abgeschlossen', x => !!x.p.closed]];
+function renderList() {
+  const all = db.projects.map(info);
+  $('chips').innerHTML = FILTERS.map(([k, l, f]) => `<button class="chip ${listFilter === k ? 'on' : ''}" data-filter="${k}">${l}<b>${all.filter(f).length}</b></button>`).join('');
+  const f = FILTERS.find(x => x[0] === listFilter)[2];
+  const rows = all.filter(f).filter(x => matches(x.p)).sort((a, b) => !!a.p.closed - !!b.p.closed || (a.p.closed ? b.p.closed.date.localeCompare(a.p.closed.date) : RANK[a.st.cls] - RANK[b.st.cls] || (a.p.name || '').localeCompare(b.p.name || '')));
+  $('listTiles').innerHTML = (rows.length ? rows.map(tileHTML).join('') : '<div class="empty" style="grid-column:1/-1">Keine Projekte in diesem Filter</div>')
+    + (['all', 'run'].includes(listFilter) ? ADD_TILE : '');
+}
+
+/* ---------- Übersicht rechts ---------- */
+function renderSide() {
+  const xs = activeP().map(info);
+  const n = countCls(xs), tot = xs.length || 1;
+  $('ovSum').innerHTML = [['', 'Gut', 'pos'], ['w', 'Achtung', 'wrn'], ['b', 'Kritisch', 'neg'], ['x', 'Verlust', 'neg']]
+    .map(([k, l, c]) => `<div><b class="${n[k] ? c : ''}">${n[k] || 0}</b><span>${l}</span></div>`).join('');
+  $('ovBar').innerHTML = ['', 'w', 'b', 'x'].map(k => `<i style="width:${(n[k] || 0) / tot * 100}%;background:${DARK.st[k]}"></i>`).join('');
+  const list = xs.filter(x => matches(x.p)).sort((a, c) => RANK[a.st.cls] - RANK[c.st.cls] || a.c.deltaChf - c.c.deltaChf);
+  $('sideList').innerHTML = list.length ? list.map(x => `<div class="orow ${TILE[x.st.cls] || ''} ${view === 'proj' && x.p.id === db.activeId ? 'on' : ''}" data-start="${x.p.id}"><span class="dot ${x.st.cls}"></span>
+      <div class="n"><div>${esc(x.p.name || 'Unbenannt')}</div><div class="s">${x.due ? '<span class="wrn">fällig</span> · ' : ''}${x.st.lbl} · ${x.c.prog}%</div></div>
+      <div class="v"><div class="${TXT[x.st.cls]}">${pct(x.c.dbProgPct)}</div><div class="s">${sgnChf(x.c.deltaChf)}</div></div></div>`).join('')
+    : '<div class="empty">Keine laufenden Projekte</div>';
+  $('ovClosed').textContent = closedP().length ? `+ ${closedP().length} abgeschlossene Projekte →` : '';
+}
+
+/* ---------- Einstellungen ---------- */
+function renderSettings() {
+  document.querySelector('[data-s="pl"]').value = S().pl || '';
+  document.querySelectorAll('[data-sr]').forEach(el => el.value = fmt(num(S().rates[+el.dataset.sr])));
+  $('sgBody').innerHTML = S().gewerke.map((g, i) => `<tr class="row">
+    <td class="n" style="padding-left:4px"><input class="in name" data-sg="${i}" data-sgf="name" value="${esc(g.name)}" placeholder="Gewerk …"></td>
+    <td><input class="in num amt" data-sg="${i}" data-sgf="price" data-num inputmode="decimal" value="${num(g.price) ? fmt(g.price) : ''}" placeholder="variiert"></td>
+    <td><button class="x" data-delsg="${i}" title="Entfernen">×</button></td></tr>`).join('');
+  renderBackupInfo(); renderAuto();
+}
+function renderBackupInfo() {
+  const lb = S().lastBackup, d = lb ? daysSince(lb) : null;
+  $('backupInfo').innerHTML = lb ? `Letzte Sicherung: <b>${dmy(lb)}</b> (${d <= 0 ? 'heute' : `vor ${d} Tagen`})${d > 7 ? ' – <span class="wrn">bitte wieder sichern</span>' : ''}` : '<span class="wrn">Noch keine Sicherung gespeichert.</span>';
+}
+function applyRates() {
+  activeP().forEach(p => latest(p).personal.forEach((x, i) => { if (i < 3) x.rate = num(S().rates[i]); }));
+}
+
+/* ---------- Projektabschluss ---------- */
+function updM(src) {
+  const vk = num($('mVk').value); let cost = num($('mCost').value), pc = num($('mPct').value);
+  if (src === 'pct') { cost = vk * (1 - pc / 100); $('mCost').value = fmt(cost); }
+  else { pc = vk ? (vk - cost) / vk * 100 : 0; $('mPct').value = pc.toFixed(1); }
+  const plan = calc(cur(), null).dbPlanPct;
+  const planChf = calc(cur(), null).dbPlan, k = classify(vk - cost, planChf);
+  $('mInfo').innerHTML = `End-DB <b>${chf(vk - cost)}</b> · DB Verkauf ${pct(plan)} (${chf(planChf)}) · <b class="${TXT[k]}">${LBL[k]}, ${sgnChf(vk - cost - planChf)}</b>`;
+}
+$('btnClose').onclick = () => {
+  const p = cur(), c = calc(p, latest(p));
+  $('mDate').value = today(); $('mVk').value = fmt(c.vk); $('mCost').value = fmt(c.eac); updM('cost');
+  $('closeModal').hidden = false;
+};
+$('mVk').oninput = () => updM('vk'); $('mCost').oninput = () => updM('cost'); $('mPct').oninput = () => updM('pct');
+$('mCancel').onclick = () => $('closeModal').hidden = true;
+$('mOk').onclick = () => {
+  const p = cur(), vk = num($('mVk').value), cost = num($('mCost').value);
+  p.closed = { date: $('mDate').value || today(), vk, cost, dbPct: vk ? (vk - cost) / vk * 100 : 0 };
+  $('closeModal').hidden = true; save(); toast('Projekt abgeschlossen – End-DB ' + pct(p.closed.dbPct)); showView('dash');
+};
+
+/* ---------- events ---------- */
+document.addEventListener('input', e => {
+  const t = e.target, d = t.dataset;
+  if (d.s) { S()[d.s] = t.value; queueSave(); return; }
+  if (d.sr != null) { S().rates[+d.sr] = num(t.value); applyRates(); renderSide(); renderPortfolioPill(); queueSave(); return; }
+  if (d.sg != null) { const g = S().gewerke[+d.sg]; g[d.sgf] = d.sgf === 'price' ? num(t.value) : t.value; queueSave(); return; }
+  if (t.id === 'search') { renderSide(); if (view === 'dash') renderDash(); if (view === 'list') renderList(); return; }
+  if (view !== 'proj') return;
+  const p = cur(), w = curWeek(p);
+  if (d.p) p[d.p] = t.hasAttribute('data-num') ? num(t.value) : t.value;
+  else if (d.w) { w[d.w] = t.hasAttribute('data-num') || t.type === 'range' ? num(t.value) : t.value; if (d.w === 'date') renderWeekSel(); }
+  else if (d.g != null) { const g = w.gewerke[+d.g]; g[d.gf] = d.gf === 'amount' ? num(t.value) : t.value; }
+  else if (d.pe != null) w.personal[+d.pe][d.pf] = num(t.value);
+  else return;
+  renderOutputs(); queueSave();
+});
+document.addEventListener('focusout', e => {
+  const t = e.target;
+  if (t.hasAttribute && t.hasAttribute('data-num') && t.value.trim() !== '' && t.dataset.p !== 'ziel' && !t.dataset.pf) t.value = fmt(num(t.value));
+});
+document.addEventListener('focusin', e => {
+  const t = e.target;
+  if (t.hasAttribute && t.hasAttribute('data-num') && t.value) t.value = String(num(t.value));
+});
+document.addEventListener('click', e => {
+  const t = e.target;
+  const nav = t.closest('[data-nav]'); if (nav) { e.preventDefault(); showView(nav.dataset.nav); return; }
+  const fl = t.closest('[data-filter]'); if (fl) { listFilter = fl.dataset.filter; renderList(); animateIn($('listTiles')); return; }
+  const au = t.closest('[data-auto]'); if (au) { autoAction(au.dataset.auto); return; }
+  const s = t.closest('[data-start]'); if (s) { startControl(s.dataset.start); return; }
+  if (t.closest('#newProjTile')) { newProj(); return; }
+  if (t.closest('#btnReopen')) { delete cur().closed; save(); renderForm(); toast('Projekt wieder geöffnet'); return; }
+  const std = t.closest('[data-std]');
+  if (std) { const w = curWeek(), g = w.gewerke[+std.dataset.std]; g.amount = stdPrice(g.name);
+    document.querySelector(`[data-g="${std.dataset.std}"][data-gf="amount"]`).value = fmt(g.amount); renderOutputs(); queueSave(); return; }
+  const dg = t.closest('[data-delg]'); if (dg) { curWeek().gewerke.splice(+dg.dataset.delg, 1); renderCostRows(); renderOutputs(); save(); return; }
+  const ds = t.closest('[data-delsg]'); if (ds) { S().gewerke.splice(+ds.dataset.delsg, 1); renderSettings(); save(); return; }
+  const hr = t.closest('#hist tr[data-wid]'); if (hr) { cur().wid = hr.dataset.wid; renderForm(); }
+});
+$('weekSel').onchange = e => { cur().wid = e.target.value; animNext = true; renderForm(); queueSave(); };
+$('btnDelWeek').onclick = () => {
+  const p = cur(), w = curWeek(p);
+  if (p.weeks.length < 2) { toast('Die einzige Erfassung kann nicht gelöscht werden'); return; }
+  if (!confirm(`Erfassung KW ${kw(w.date)} (${dmy(w.date)}) löschen?`)) return;
+  p.weeks = p.weeks.filter(x => x.id !== w.id); p.wid = latest(p).id; renderForm(); save();
+};
+$('btnAddGw').onclick = () => { curWeek().gewerke.push({ name: '', amount: 0 }); renderCostRows(); renderOutputs(); save();
+  const ins = $('gwBody').querySelectorAll('input.name'); if (ins.length) ins[ins.length - 1].focus(); };
+$('btnAddSg').onclick = () => { S().gewerke.push({ name: '', price: 0 }); renderSettings(); save();
+  const ins = $('sgBody').querySelectorAll('input.name'); ins[ins.length - 1].focus(); };
+$('btnNewProj').onclick = newProj;
+$('btnDelProj').onclick = () => {
+  const p = cur();
+  if (!confirm(`Projekt «${p.name}» mit allen Erfassungen löschen?`)) return;
+  db.projects = db.projects.filter(x => x.id !== p.id);
+  db.activeId = null; save(); showView('dash');
+};
+$('search').addEventListener('keydown', e => { if (e.key === 'Enter') { const f = $('sideList').querySelector('[data-start]'); if (f) f.click(); } });
+
+/* ---------- Datensicherung ---------- */
+const ymd = () => today().replace(/-/g, '');
+function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+function exportBackup(auto) {
+  S().lastBackup = today(); storeLocal();
+  download(`Projektkontrolling_Backup_${ymd()}.json`, new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
+  if ($('backupInfo')) renderBackupInfo();
+  toast(auto ? 'Wöchentliches Auto-Backup heruntergeladen' : 'Backup gespeichert');
+}
+$('btnExport').onclick = () => exportBackup(false);
+
+/* ---------- automatische Datensicherung ----------
+   Chrome/Edge: einmal eine Datei wählen, danach wird jede Änderung direkt dorthin geschrieben.
+   Andere Browser: einmal pro Woche beim Öffnen automatisch ein Backup herunterladen. */
+const FS_OK = 'showSaveFilePicker' in window;
+const A = () => S().auto || (S().auto = { mode: 'off', file: '', last: null });
+let fileHandle = null, autoState = 'off', autoT;   // autoState: off | on | paused
+function idb(mode, fn) {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('projektkontrolling', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => { const tx = r.result.transaction('kv', mode), q = fn(tx.objectStore('kv')); tx.oncomplete = () => res(q && q.result); tx.onerror = () => rej(tx.error); };
+    r.onerror = () => rej(r.error);
+  });
+}
+async function initAuto() {
+  try {
+    if (A().mode === 'file' && FS_OK) {
+      fileHandle = await idb('readonly', s => s.get('handle'));
+      autoState = fileHandle ? ((await fileHandle.queryPermission({ mode: 'readwrite' })) === 'granted' ? 'on' : 'paused') : 'off';
+    } else if (A().mode === 'download') {
+      autoState = 'on';
+      if (!S().lastBackup || daysSince(S().lastBackup) >= 7) exportBackup(true);
+    }
+  } catch (e) { autoState = 'paused'; }
+  renderAuto();
+}
+function queueAuto() { if (autoState === 'on' && A().mode === 'file') { clearTimeout(autoT); autoT = setTimeout(writeAuto, 1500); } }
+async function writeAuto() {
+  try {
+    A().last = new Date().toISOString(); S().lastBackup = today();
+    const w = await fileHandle.createWritable(); await w.write(JSON.stringify(db, null, 2)); await w.close();
+    storeLocal(); renderAuto(true);
+  } catch (e) { autoState = 'paused'; renderAuto(); }
+}
+async function autoAction(a) {
+  try {
+    if (a === 'choose') {
+      fileHandle = await showSaveFilePicker({ suggestedName: 'Projektkontrolling_Backup.json', types: [{ description: 'Backup (JSON)', accept: { 'application/json': ['.json'] } }] });
+      await idb('readwrite', s => s.put(fileHandle, 'handle'));
+      A().mode = 'file'; A().file = fileHandle.name; autoState = 'on'; await writeAuto(); toast('Automatische Sicherung aktiv');
+    } else if (a === 'resume') {
+      if (!fileHandle) return autoAction('choose');
+      autoState = (await fileHandle.requestPermission({ mode: 'readwrite' })) === 'granted' ? 'on' : 'paused';
+      if (autoState === 'on') { await writeAuto(); toast('Automatische Sicherung fortgesetzt'); }
+    } else if (a === 'download') {
+      A().mode = 'download'; autoState = 'on'; storeLocal(); toast('Wöchentliches Auto-Backup aktiv');
+    } else if (a === 'off') {
+      A().mode = 'off'; autoState = 'off'; fileHandle = null; storeLocal();
+      try { await idb('readwrite', s => s.delete('handle')); } catch (e) {}
+    } else if (a === 'open') { showView('settings'); return; }
+  } catch (e) { if (e.name !== 'AbortError') toast('Sicherungsdatei konnte nicht verwendet werden'); }
+  renderAuto();
+}
+function renderAuto(flash) {
+  const m = A().mode, last = A().last ? new Date(A().last).toLocaleString('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
+  const pill = $('autoPill');
+  if (m === 'file' && autoState === 'paused') {
+    pill.className = 'btn sm warnbtn'; pill.dataset.auto = 'resume';
+    pill.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>Auto-Sicherung fortsetzen';
+  } else if (m === 'file' && autoState === 'on') {
+    pill.className = 'btn sm okbtn'; pill.dataset.auto = 'open';
+    pill.innerHTML = `<span class="dot"></span>Gesichert ${last ? last.slice(-5) : ''}`;
+    if (flash) { pill.classList.remove('saved'); void pill.offsetWidth; pill.classList.add('saved'); }
+  } else pill.className = 'btn sm view-hidden';
+  const badge = $('autoBadge');
+  const on = autoState === 'on' && m !== 'off', paused = autoState === 'paused' && m === 'file';
+  badge.className = 'badge ' + (on ? 'ok' : paused ? '' : 'grey');
+  badge.textContent = on ? 'Aktiv' : paused ? 'Pausiert' : 'Aus';
+  let h;
+  if (FS_OK) {
+    if (on && m === 'file') h = `<div class="autostate"><span class="dot"></span><div>Jede Änderung wird automatisch gespeichert in <b>${esc(A().file)}</b>.<br><span class="muted">Zuletzt: ${last || '–'}</span></div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-auto="choose">Andere Datei wählen</button><button class="btn sm danger" data-auto="off">Ausschalten</button></div>`;
+    else if (paused) h = `<div class="autostate"><span class="dot w"></span><div>Der Browser verlangt nach jedem Neustart einmal eine Bestätigung für <b>${esc(A().file)}</b>.</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm warnbtn" data-auto="resume">Auto-Sicherung fortsetzen</button><button class="btn sm danger" data-auto="off">Ausschalten</button></div>`;
+    else h = `<p class="muted" style="margin:0 0 12px;font-size:13px;line-height:1.5">Wähle einmal eine Sicherungsdatei, am besten in einem OneDrive- oder Server-Ordner. Danach wird <b>jede Änderung automatisch</b> dorthin gespeichert.</p>
+      <button class="btn primary" data-auto="choose">Sicherungsdatei wählen</button>`;
+  } else {
+    h = `<p class="muted" style="margin:0 0 12px;font-size:13px;line-height:1.5">Direktes Speichern in eine Datei geht nur in Chrome oder Edge. In diesem Browser kann beim Öffnen <b>einmal pro Woche automatisch ein Backup heruntergeladen</b> werden.</p>`
+      + (m === 'download' ? `<div class="autostate"><span class="dot"></span><div>Wöchentlicher Download aktiv.<br><span class="muted">Letzte Sicherung: ${dmy(S().lastBackup)}</span></div></div><button class="btn sm danger" data-auto="off">Ausschalten</button>`
+        : `<button class="btn primary" data-auto="download">Wöchentlichen Download einschalten</button>`);
+  }
+  $('autoBox').innerHTML = h;
+}
+$('btnImport').onclick = () => $('fileImport').click();
+$('fileImport').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const d = JSON.parse(r.result);
+      if (!d || !Array.isArray(d.projects)) throw 0;
+      if (!confirm(`Backup mit ${d.projects.length} Projekt(en) laden? Aktuelle Daten werden ersetzt.`)) return;
+      const auto = A(); d.settings = normSettings(d.settings); d.settings.auto = auto; db = d;
+      save(); showView('dash'); renderAuto(); toast('Backup geladen');
+    } catch (err) { alert('Datei ist kein gültiges Projektkontrolling-Backup.'); }
+  };
+  r.readAsText(f); e.target.value = '';
+};
+
+/* ---------- PDF (immer eine A4-Seite) ---------- */
+function pdfName(p) {
+  const n = (p.name || 'Projekt').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-');
+  return `Controling_${n}_${ymd()}`;
+}
+function reportHTML(p, w) {
+  const c = calc(p, w), st = status(c);
+  const col = LIGHT.st[st.cls];
+  const gw = w.gewerke.filter(g => num(g.amount)).map(g => `<tr><td>${esc(g.name || 'Weitere Position')}</td><td></td><td class="r">${fmt(g.amount)}</td></tr>`).join('') || '<tr><td colspan="3" class="m">Keine offenen Gewerke</td></tr>';
+  const pe = w.personal.map(x => `<tr><td>${esc(x.name)}</td><td class="r">${num(x.hours) || '–'} h × ${fmt(x.rate)}</td><td class="r">${fmt(num(x.rate) * num(x.hours))}</td></tr>`).join('');
+  const hist = sortedWeeks(p).filter(x => x.date <= w.date).reverse().slice(0, 5).map(x => { const k = calc(p, x), kc = LIGHT.st[status(k).cls]; return `<tr${x.id === w.id ? ' class="cur"' : ''}><td>KW ${kw(x.date)} · ${dmy(x.date)}</td><td class="r">${k.prog}%</td><td class="r">${fmt(k.ist)}</td><td class="r">${fmt(k.rest)}</td><td class="r"><b>${fmt(k.eac)}</b></td><td class="r" style="color:${kc}">${pct(k.dbProgPct)}</td><td class="r" style="color:${kc}">${sgnChf(k.deltaChf)}</td></tr>`; }).join('');
+  const tile = (l, v, cl) => `<div class="tile"><div class="tl">${l}</div><div class="tv"${cl ? ` style="color:${cl}"` : ''}>${v}</div></div>`;
+  const stTxt = p.closed ? `Abgeschlossen am ${dmy(p.closed.date)} · End-DB ${pct(p.closed.dbPct)} (${chf(p.closed.vk - p.closed.cost)}) · ${sgnChf(p.closed.vk - p.closed.cost - c.dbPlan)} zu Verkauf` : esc(st.txt);
+  return `<div class="rp"><style>
+  .rp{font-family:Outfit,Arial,sans-serif;color:#222;font-size:11px;width:760px;padding:4px 2px;background:#fff;line-height:1.35}
+  .rp *{box-sizing:border-box}
+  .rp .hd{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;border-bottom:3px solid #4f9a48;padding-bottom:10px;margin-bottom:10px}
+  .rp .lab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#4f9a48;font-weight:600}
+  .rp h1{font-size:22px;margin:2px 0 0;font-weight:500}.rp .sub{color:#555;margin-top:3px}
+  .rp .meta{text-align:right;color:#555;font-size:11px;flex:0 0 auto;white-space:nowrap}
+  .rp .meta b{display:block;font-size:16px;color:#222;font-weight:600}
+  .rp .st{padding:7px 12px;border-radius:8px;background:#f4f7f3;border-left:4px solid ${col};margin-bottom:10px;font-size:12px}
+  .rp .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}
+  .rp .tile{border:1px solid #e3e6e3;border-radius:8px;padding:7px 10px}.rp .tl{color:#777;font-size:10px}.rp .tv{font-size:14px;font-weight:600;margin-top:2px;white-space:nowrap}
+  .rp h2{font-size:12.5px;margin:10px 0 5px;font-weight:600}
+  .rp table{width:100%;border-collapse:collapse}.rp td,.rp th{padding:3px 6px;border-bottom:1px solid #eceeec;text-align:left}
+  .rp th{background:#f1f1f1;font-weight:600;font-size:10.5px}.rp .r{text-align:right;white-space:nowrap}.rp .m{color:#888}
+  .rp tr.tot td{font-weight:700;background:#e9f2e7;border-top:1.5px solid #333}.rp tr.cur td{background:#f0f7ee}
+  .rp .two{display:grid;grid-template-columns:1.05fr 1fr;gap:16px}
+  .rp .note{border:1px solid #e3e6e3;border-radius:8px;padding:7px 10px;min-height:28px;white-space:pre-wrap}
+  .rp .ft{margin-top:8px;color:#999;font-size:9.5px;border-top:1px solid #eee;padding-top:5px;display:flex;justify-content:space-between}
+  </style>
+  <div class="hd"><div><div class="lab">Projektkontrolling</div><h1>${esc(p.name)}</h1>
+    <div class="sub">${p.nr ? 'Projekt-Nr. ' + esc(p.nr) + ' · ' : ''}Projektleiter: ${esc(S().pl || '–')}</div></div>
+    <div class="meta"><b>KW ${kw(w.date)} · ${dmy(w.date)}</b>Erstellt: ${dmy(today())}</div></div>
+  <div class="st"><b>Status:</b> ${stTxt}</div>
+  <div class="tiles">
+    ${tile('Verkauf VK', chf(c.vk))}${tile('Kosten EK', chf(c.ek))}${tile('DB Verkauf', pct(c.dbPlanPct) + ' · ' + chf(c.dbPlan))}${tile('Status', st.lbl, col)}
+    ${tile('Landung (Endkosten)', chf(c.eac))}${tile('DB Prognose', pct(c.dbProgPct) + ' · ' + chf(c.dbProg), col)}${tile('Δ zu Verkauf', sgnChf(c.deltaChf), col)}${tile('Trend nach Fortschritt', pct(c.dbTrendPct))}
+  </div>
+  <div class="two">
+    <div><h2>Noch erwartete Kosten (CHF)</h2>
+      <table><tr><th>Gewerke / Fremdleistungen</th><th></th><th class="r">CHF</th></tr>${gw}
+      <tr><th>Personal</th><th class="r">Aufwand</th><th class="r">CHF</th></tr>${pe}
+      <tr class="tot"><td>Total noch erwartet</td><td></td><td class="r">${fmt(c.rest)}</td></tr></table></div>
+    <div><h2>Kostenübersicht (CHF)</h2><table>
+      <tr><td>Aufgelaufene Kosten (Ist)</td><td class="r">${fmt(c.ist)}</td></tr>
+      <tr><td>Noch erwartete Kosten</td><td class="r">${fmt(c.rest)}</td></tr>
+      <tr class="tot"><td>Endkosten Prognose</td><td class="r">${fmt(c.eac)}</td></tr>
+      <tr><td>Kosten EK (Kalkulation)</td><td class="r">${fmt(c.ek)}</td></tr>
+      <tr><td>Abweichung zu EK</td><td class="r" style="color:${c.ek - c.eac >= 0 ? '#4f9a48' : '#c9543c'}">${sgnChf(c.ek - c.eac)}</td></tr>
+      <tr><td>Fortschritt</td><td class="r">${c.prog}%</td></tr>
+      <tr><td>Budgetverbrauch (Ist / EK)</td><td class="r">${c.ek ? pct(c.ist / c.ek * 100, 0) : '–'}</td></tr></table>
+      <h2>Bemerkung / Massnahmen</h2><div class="note">${esc(w.note) || '<span class="m">–</span>'}</div></div>
+  </div>
+  <h2>Verlauf · Wo landen die Kosten?</h2>${chartSVG(p, LIGHT, 215, false, w)}
+  <div style="font-size:9.5px;color:#777;margin:0 0 6px">Grün: Ist-Kosten nach Fortschritt · gestrichelt: Prognose bis Abschluss · Landezone rechts: grün bis EK, orange bis ½ DB, rot bis VK, dunkelrot = Verlust</div>
+  <table><tr><th>Erfassung</th><th class="r">Fortschritt</th><th class="r">Ist</th><th class="r">+ noch kommt</th><th class="r">= Landung</th><th class="r">DB</th><th class="r">Δ zu Verkauf</th></tr>${hist}</table>
+  <div class="ft"><span>Prognose = Ist + noch erwartete Kosten · Trend = Ist ÷ Fortschritt · Beträge in CHF</span><span>${esc(S().pl || '')}</span></div>
+  </div>`;
+}
+$('btnPdf').onclick = async () => {
+  const p = cur(), w = curWeek(p), name = pdfName(p), html = reportHTML(p, w);
+  const host = document.createElement('div');
+  host.style.cssText = 'position:fixed;left:-20000px;top:0;background:#fff';
+  host.innerHTML = html; document.body.appendChild(host);
+  try {
+    if (!window.html2canvas || !window.jspdf) throw new Error('offline');
+    toast('PDF wird erstellt …');
+    if (document.fonts) await document.fonts.ready;
+    const el = host.querySelector('.rp');
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', windowWidth: 1200 });
+    const pdf = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    const PW = 210, PH = 297, M = 10;
+    let iw = PW - 2 * M, ih = canvas.height * iw / canvas.width;
+    if (ih > PH - 2 * M) { ih = PH - 2 * M; iw = canvas.width * ih / canvas.height; }   // auf eine Seite skalieren
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (PW - iw) / 2, M, iw, ih);
+    pdf.save(name + '.pdf');
+    toast('PDF gespeichert: ' + name + '.pdf');
+  } catch (e) {
+    // ohne Internet: Druckdialog → «Als PDF speichern»
+    $('printArea').innerHTML = html; const t = document.title; document.title = name;
+    window.print(); document.title = t; $('printArea').innerHTML = '';
+  } finally { host.remove(); }
+};
+
+let toastT;
+function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), 2600); }
+
+showView('dash');
+initAuto();
+</script>
+</body>
+</html>
