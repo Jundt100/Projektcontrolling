@@ -104,6 +104,12 @@ table.ct{width:100%;border-collapse:separate;border-spacing:0 4px;font-size:13.5
 .ct tr.sum td{padding:12px 10px;font-weight:500;border-top:1px solid var(--card-b)}
 .ct tr.total td{padding:12px 10px;font-weight:600;font-size:15px;background:rgba(169,214,161,.1);border-top:1px solid rgba(169,214,161,.3)}
 .ct tr.total td:first-child{border-radius:10px 0 0 10px}.ct tr.total td:last-child{border-radius:0 10px 10px 0}
+.cw{position:relative;display:block}
+.cw .in{padding-right:24px!important}
+.clr{position:absolute;right:5px;top:50%;transform:translateY(-50%) scale(.6);width:18px;height:18px;border-radius:50%;border:0;padding:0;
+  background:rgba(255,255,255,.1);color:var(--muted);font-size:14px;line-height:18px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .15s,transform .15s,background .15s}
+.cw.has .clr{opacity:1;pointer-events:auto;transform:translateY(-50%) scale(1)}
+.clr:hover{background:var(--bad);color:#fff}
 .std{font-size:11px;border:1px solid rgba(169,214,161,.3);background:rgba(169,214,161,.08);color:var(--accent);border-radius:8px;padding:4px 6px;cursor:pointer;white-space:nowrap;width:100%}
 .std:hover{background:rgba(169,214,161,.2)}
 .std.same{opacity:.3}
@@ -797,13 +803,13 @@ function renderCostRows() {
     return `<tr class="row">
       <td class="n" colspan="2">${g.fixed ? esc(g.name) : `<input class="in name" data-g="${i}" data-gf="name" value="${esc(g.name)}" placeholder="Weitere Position …">`}</td>
       <td>${sp ? `<button class="std ${num(g.amount) === sp ? 'same' : ''}" data-std="${i}" title="Standardpreis einsetzen">${fmt(sp)}</button>` : ''}</td>
-      <td><input class="in num amt" data-g="${i}" data-gf="amount" data-num inputmode="decimal" value="${num(g.amount) ? fmt(g.amount) : ''}" placeholder="0"></td>
+      <td><span class="cw ${num(g.amount) ? 'has' : ''}"><input class="in num amt" data-g="${i}" data-gf="amount" data-num inputmode="decimal" value="${num(g.amount) ? fmt(g.amount) : ''}" placeholder="0"><button class="clr" data-clr="g:${i}" title="Betrag löschen" tabindex="-1">×</button></span></td>
       <td>${g.fixed ? '' : `<button class="x" data-delg="${i}" title="Entfernen">×</button>`}</td></tr>`;
   }).join('');
   $('peBody').innerHTML = w.personal.map((x, i) => `<tr class="row">
       <td class="n">${esc(x.name)}</td>
       <td class="out">${fmt(x.rate)}/h</td>
-      <td><input class="in num amt" data-pe="${i}" data-pf="hours" data-num inputmode="decimal" value="${num(x.hours) || ''}" placeholder="0"></td>
+      <td><span class="cw ${num(x.hours) ? 'has' : ''}"><input class="in num amt" data-pe="${i}" data-pf="hours" data-num inputmode="decimal" value="${num(x.hours) || ''}" placeholder="0"><button class="clr" data-clr="pe:${i}" title="Stunden löschen" tabindex="-1">×</button></span></td>
       <td class="out" id="pt${i}">–</td><td></td></tr>`).join('');
 }
 function renderOutputs() {
@@ -995,8 +1001,8 @@ document.addEventListener('input', e => {
   const p = cur(), w = curWeek(p);
   if (d.p) p[d.p] = t.hasAttribute('data-num') ? num(t.value) : t.value;
   else if (d.w) { w[d.w] = t.hasAttribute('data-num') || t.type === 'range' ? num(t.value) : t.value; if (d.w === 'date') renderWeekSel(); }
-  else if (d.g != null) { const g = w.gewerke[+d.g]; g[d.gf] = d.gf === 'amount' ? num(t.value) : t.value; }
-  else if (d.pe != null) w.personal[+d.pe][d.pf] = num(t.value);
+  else if (d.g != null) { const g = w.gewerke[+d.g]; g[d.gf] = d.gf === 'amount' ? num(t.value) : t.value; if (d.gf === 'amount') t.parentNode.classList.toggle('has', !!num(t.value)); }
+  else if (d.pe != null) { w.personal[+d.pe][d.pf] = num(t.value); t.parentNode.classList.toggle('has', !!num(t.value)); }
   else return;
   renderOutputs(); queueSave();
 });
@@ -1014,6 +1020,13 @@ document.addEventListener('click', e => {
   const fl = t.closest('[data-filter]'); if (fl) { listFilter = fl.dataset.filter; renderList(); animateIn($('listTiles')); return; }
   const au = t.closest('[data-auto]'); if (au) { autoAction(au.dataset.auto); return; }
   const cl = t.closest('[data-cloud]'); if (cl) { cloudAction(cl.dataset.cloud); return; }
+  const cr = t.closest('[data-clr]');
+  if (cr) {   // Betrag bzw. Stunden einer Kostenzeile löschen
+    const [kind, i] = cr.dataset.clr.split(':'), w = curWeek();
+    if (kind === 'g') w.gewerke[+i].amount = 0; else w.personal[+i].hours = 0;
+    cr.previousElementSibling.value = ''; cr.parentNode.classList.remove('has');
+    renderOutputs(); queueSave(); return;
+  }
   const s = t.closest('[data-start]'); if (s) { startControl(s.dataset.start); return; }
   if (t.closest('#newProjTile')) { newProj(); return; }
   if (t.closest('#btnReopen')) { delete cur().closed; save(); renderForm(); toast('Projekt wieder geöffnet'); return; }
@@ -1166,6 +1179,7 @@ const EMBEDDED_FIREBASE = {
   messagingSenderId: '116287719325',
   appId: '1:116287719325:web:6e113856b7db98070ed174'
 };
+const FB_EMAIL = 'nicola.jundt@ckw.ch';   // in Firebase angelegter Benutzer (im Login vorausgefüllt)
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEVICE = (() => { try { let d = localStorage.getItem('pk.device'); if (!d) { d = uid(); localStorage.setItem('pk.device', d); } return d; } catch (e) { return uid(); } })();
 let fb = null, fbUser = null, cloudState = 'off', cloudT, cloudUnsub = null;   // off | file | login | sync | ok | error
@@ -1273,10 +1287,10 @@ function renderCloud(flash) {
     error: `<div class="autostate"><span class="dot b"></span><div>Verbindung zu Firebase fehlgeschlagen. Internet, Konfiguration und Firestore-Regeln prüfen. Deine Daten sind lokal weiterhin gespeichert.</div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="retry">Erneut versuchen</button><button class="btn sm" data-cloud="edit">Konfiguration ändern</button></div>`,
     sync: `<div class="autostate"><span class="dot w"></span><div>Verbinde mit Firebase …</div></div>`,
-    login: `<div class="f2"><div class="field"><label class="lbl">E-Mail</label><input class="in" id="cEmail" type="email" autocomplete="username"></div>
+    login: `<div class="f2"><div class="field"><label class="lbl">E-Mail</label><input class="in" id="cEmail" type="email" autocomplete="username" value="${esc(FB_EMAIL)}"></div>
       <div class="field"><label class="lbl">Passwort</label><input class="in" id="cPw" type="password" autocomplete="current-password"></div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-cloud="login">Anmelden</button><button class="btn" data-cloud="signup">Konto erstellen</button><button class="btn sm" data-cloud="reset">Passwort vergessen</button></div>
-      <div class="foot">Beim ersten Mal auf dem Hauptgerät «Konto erstellen» – deine bestehenden Projekte werden dann hochgeladen. Auf dem Geschäftslaptop nur «Anmelden».</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-cloud="login">Anmelden</button><button class="btn sm" data-cloud="reset">Passwort vergessen</button></div>
+      <div class="foot">Mit dem in Firebase angelegten Konto anmelden. Beim ersten Mal werden die Projekte dieses Geräts hochgeladen; auf jedem weiteren Gerät (z. B. Geschäftslaptop) werden sie geladen.</div>
       <div class="mt"><button class="btn sm" data-cloud="edit">Konfiguration ändern</button></div>`,
     ok: `<div class="autostate"><span class="dot"></span><div>Angemeldet als <b>${esc(fbUser && fbUser.email)}</b>. Jede Änderung wird automatisch in Firebase gespeichert.<br><span class="muted">Zuletzt: ${last || '–'}</span></div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="push">Jetzt speichern</button><button class="btn sm danger" data-cloud="logout">Abmelden</button></div>`
