@@ -1286,8 +1286,9 @@ function renderCloud(flash) {
 
 /* ---------- PDF (immer eine A4-Seite) ---------- */
 function pdfName(p) {
-  const n = (p.name || 'Projekt').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-');
-  return `Controling_${n}_${ymd()}`;
+  // Projektnummer; falls leer, Projektname als Ersatz
+  const n = (p.nr || p.name || 'Projekt').trim().replace(/[\\/:*?"<>|]/g, '').replace(/\s+/g, '-');
+  return `Projektcontrolling_${n}_${ymd().slice(2)}`;   // Datum als JJMMTT
 }
 function reportHTML(p, w) {
   const c = calc(p, w), st = status(c);
