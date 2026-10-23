@@ -1157,11 +1157,19 @@ $('fileImport').onchange = e => {
 /* ---------- Firebase-Speicher ----------
    Die Seite läuft auf GitHub Pages, die Daten liegen in Firestore unter users/{uid}.
    Anmeldung mit E-Mail/Passwort; jede Änderung wird hochgeladen, Änderungen vom anderen Gerät kommen live herein. */
-const EMBEDDED_FIREBASE = null;   // optional: Firebase-Konfiguration hier fest eintragen, dann entfällt das Einfügen
+// Firebase-Konfiguration (öffentlich, die Daten schützen die Firestore-Regeln). Eine in den Einstellungen eingefügte Konfiguration hat Vorrang.
+const EMBEDDED_FIREBASE = {
+  apiKey: 'AIzaSyC1tKYAjPUEKwnGAqy76zf21I8ZvIDbSYg',
+  authDomain: 'projektkontrolling-a96e7.firebaseapp.com',
+  projectId: 'projektkontrolling-a96e7',
+  storageBucket: 'projektkontrolling-a96e7.firebasestorage.app',
+  messagingSenderId: '116287719325',
+  appId: '1:116287719325:web:6e113856b7db98070ed174'
+};
 const FB_SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const DEVICE = (() => { try { let d = localStorage.getItem('pk.device'); if (!d) { d = uid(); localStorage.setItem('pk.device', d); } return d; } catch (e) { return uid(); } })();
 let fb = null, fbUser = null, cloudState = 'off', cloudT, cloudUnsub = null;   // off | file | login | sync | ok | error
-function fbConfig() { if (EMBEDDED_FIREBASE) return EMBEDDED_FIREBASE; try { return JSON.parse(localStorage.getItem('pk.firebase')); } catch (e) { return null; } }
+function fbConfig() { try { const c = JSON.parse(localStorage.getItem('pk.firebase')); if (c) return c; } catch (e) {} return EMBEDDED_FIREBASE; }
 function parseConfig(txt) {
   const m = String(txt).match(/\{[\s\S]*\}/); if (!m) throw 0;
   const c = JSON.parse(m[0].replace(/([{,]\s*)([A-Za-z_]\w*)\s*:/g, '$1"$2":').replace(/'/g, '"').replace(/,\s*}/g, '}'));
@@ -1234,6 +1242,7 @@ async function cloudAction(a) {
     if (a === 'forget') { if (!confirm('Firebase-Verbindung auf diesem Gerät entfernen? Die Daten in Firebase bleiben erhalten.')) return; localStorage.removeItem('pk.firebase'); if (fb) await fb.auth().signOut(); location.reload(); return; }
     if (a === 'retry') return fbUser ? connectCloud() : initCloud();
     if (a === 'open') return showView('settings');
+    if (a === 'edit') { cloudState = 'off'; return renderCloud(); }
     const auth = fb.auth(), em = ($('cEmail') || {}).value, pw = ($('cPw') || {}).value;
     if (a === 'login') await auth.signInWithEmailAndPassword((em || '').trim(), pw || '');
     if (a === 'signup') await auth.createUserWithEmailAndPassword((em || '').trim(), pw || '');
@@ -1262,13 +1271,13 @@ function renderCloud(flash) {
       <button class="btn primary mt" data-cloud="cfg">Firebase verbinden</button>`,
     file: `<div class="autostate"><span class="dot w"></span><div>Firebase funktioniert nur über die <b>Web-Adresse</b> (GitHub Pages), nicht beim Öffnen als lokale Datei.</div></div>${forget}`,
     error: `<div class="autostate"><span class="dot b"></span><div>Verbindung zu Firebase fehlgeschlagen. Internet, Konfiguration und Firestore-Regeln prüfen. Deine Daten sind lokal weiterhin gespeichert.</div></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="retry">Erneut versuchen</button>${forget}</div>`,
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="retry">Erneut versuchen</button><button class="btn sm" data-cloud="edit">Konfiguration ändern</button></div>`,
     sync: `<div class="autostate"><span class="dot w"></span><div>Verbinde mit Firebase …</div></div>`,
     login: `<div class="f2"><div class="field"><label class="lbl">E-Mail</label><input class="in" id="cEmail" type="email" autocomplete="username"></div>
       <div class="field"><label class="lbl">Passwort</label><input class="in" id="cPw" type="password" autocomplete="current-password"></div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" data-cloud="login">Anmelden</button><button class="btn" data-cloud="signup">Konto erstellen</button><button class="btn sm" data-cloud="reset">Passwort vergessen</button></div>
       <div class="foot">Beim ersten Mal auf dem Hauptgerät «Konto erstellen» – deine bestehenden Projekte werden dann hochgeladen. Auf dem Geschäftslaptop nur «Anmelden».</div>
-      <div class="mt">${forget}</div>`,
+      <div class="mt"><button class="btn sm" data-cloud="edit">Konfiguration ändern</button></div>`,
     ok: `<div class="autostate"><span class="dot"></span><div>Angemeldet als <b>${esc(fbUser && fbUser.email)}</b>. Jede Änderung wird automatisch in Firebase gespeichert.<br><span class="muted">Zuletzt: ${last || '–'}</span></div></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" data-cloud="push">Jetzt speichern</button><button class="btn sm danger" data-cloud="logout">Abmelden</button></div>`
   };
