@@ -1378,12 +1378,13 @@ $('btnPdf').onclick = async () => {
     toast('PDF wird erstellt …');
     if (document.fonts) await document.fonts.ready;
     const el = host.querySelector('.rp');
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', windowWidth: 1200 });
+    // 4-fache Auflösung (~400 dpi auf A4), damit Text auch beim Zoomen scharf bleibt
+    const canvas = await html2canvas(el, { scale: 4, backgroundColor: '#ffffff', windowWidth: 1200 });
     const pdf = new jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
     const PW = 210, PH = 297, M = 10;
     let iw = PW - 2 * M, ih = canvas.height * iw / canvas.width;
     if (ih > PH - 2 * M) { ih = PH - 2 * M; iw = canvas.width * ih / canvas.height; }   // auf eine Seite skalieren
-    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', (PW - iw) / 2, M, iw, ih);
+    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (PW - iw) / 2, M, iw, ih, undefined, 'FAST');   // PNG = verlustfrei, keine JPEG-Artefakte
     pdf.save(name + '.pdf');
     toast('PDF gespeichert: ' + name + '.pdf');
   } catch (e) {
